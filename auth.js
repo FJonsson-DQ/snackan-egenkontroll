@@ -1,6 +1,15 @@
 // Skapar Supabase-klienten och styr inloggningsrutan (gate).
 // Exponerar window.sb för Fas 2 (datalagring).
-window.sb = supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+// PKCE-flödet (i stället för det gamla "implicit") sparar sessionen korrekt så
+// att man förblir inloggad efter en omladdning.
+window.sb = supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY, {
+  auth: {
+    flowType: 'pkce',
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+  },
+});
 
 const gate = document.getElementById('auth-gate');
 const authMsg = document.getElementById('auth-msg');
