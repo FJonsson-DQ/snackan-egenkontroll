@@ -1,13 +1,15 @@
 // Skapar Supabase-klienten och styr inloggningsrutan (gate).
 // Exponerar window.sb för Fas 2 (datalagring).
-// PKCE-flödet (i stället för det gamla "implicit") sparar sessionen korrekt så
-// att man förblir inloggad efter en omladdning.
+// Implicit-flödet: Google skickar tillbaka inloggningen direkt i URL:ens #-del,
+// så ingen "code verifier" behöver sparas i förväg. Det gör inloggningen robust
+// även när man loggar in från olika enheter eller appen på hemskärmen.
+// persistSession sparar sessionen så man förblir inloggad efter omladdning.
 window.sb = supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY, {
   auth: {
-    flowType: 'pkce',
+    flowType: 'implicit',
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: false, // vi växlar in koden manuellt (se start())
+    detectSessionInUrl: true,
   },
 });
 
@@ -49,6 +51,15 @@ logoutBtn.addEventListener('click', async () => {
   await window.sb.auth.signOut();
   showLogin();
 });
+
+// Utloggningsknapp i appens header (visas när man är inloggad).
+const headerLogoutBtn = document.getElementById('header-logout');
+if (headerLogoutBtn) {
+  headerLogoutBtn.addEventListener('click', async () => {
+    await window.sb.auth.signOut();
+    showLogin();
+  });
+}
 
 // Slår upp den inloggades egen rad i tillåtlistan. Returnerar true om åtkomst.
 async function isAllowed(email) {
@@ -92,23 +103,17 @@ function showError(text) {
   logoutBtn.classList.add('hidden');
 }
 
-// Växlar in ?code= från Google-redirekten till en session och rensar adressen.
-async function handleOAuthRedirect() {
-  const url = new URL(window.location.href);
-  const code = url.searchParams.get('code');
-  if (!code) return;
-  showLoggingIn();
-  const { error } = await window.sb.auth.exchangeCodeForSession(code);
-  url.searchParams.delete('code');
-  window.history.replaceState({}, document.title, url.pathname + url.search + url.hash);
-  if (error) {
-    console.error('Inloggningsfel:', error);
-    showError('Inloggningen kunde inte slutföras. Tryck och försök igen.');
-  }
-}
-
+// Implicit-flödet lägger tokens (eller fel) i URL:ens #-del. supabase-js läser
+// och rensar dem automatiskt vid start; här visar vi bara rätt status.
 async function start() {
-  await handleOAuthRedirect();
+  const hash = window.location.hash || '';
+  if (hash.includes('error')) {
+    const params = new URLSearchParams(hash.slice(1));
+    console.error('Inloggningsfel:', params.get('error_description') || params.get('error'));
+    showError('Inloggningen avbröts eller misslyckades. Försök igen.');
+    return;
+  }
+  if (hash.includes('access_token')) showLoggingIn();
   await evaluateSession();
 }
 

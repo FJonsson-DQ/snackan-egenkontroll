@@ -66,12 +66,12 @@ body {
   align-items: center;
   gap: 12px;
 }
-.logo-shell {
-  width: 34px;
-  height: 34px;
-  color: var(--seafoam);
+.header-logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
   flex: none;
-  margin: 10px 0;
+  margin: 9px 0;
 }
 .header-text { padding: 10px 0; }
 .app-header h1 {
@@ -87,8 +87,7 @@ body {
   letter-spacing: 0.22em;
   color: var(--seafoam);
 }
-.theme-toggle {
-  margin-left: auto;
+.header-btn {
   flex: none;
   width: 42px;
   height: 42px;
@@ -102,8 +101,10 @@ body {
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
-.theme-toggle:active { background: rgba(255, 255, 255, 0.22); }
-.theme-toggle svg { width: 22px; height: 22px; }
+.header-btn:active { background: rgba(255, 255, 255, 0.22); }
+.header-btn svg { width: 22px; height: 22px; }
+/* Tema-knappen skjuter sig och utloggningsknappen till höger */
+.theme-toggle { margin-left: auto; }
 /* Visa måne i ljust läge (klick = mörkt), sol i mörkt läge (klick = ljust) */
 .theme-toggle .icon-sun { display: none; }
 [data-theme="dark"] .theme-toggle .icon-moon { display: none; }
