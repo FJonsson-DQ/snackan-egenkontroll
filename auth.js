@@ -7,7 +7,7 @@ window.sb = supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY,
     flowType: 'pkce',
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: true,
+    detectSessionInUrl: false, // vi växlar in koden manuellt (se start())
   },
 });
 
@@ -37,9 +37,11 @@ function showApp() {
 }
 
 loginBtn.addEventListener('click', async () => {
+  // Ren adress utan ev. gammal ?code= eller #-rester.
+  const cleanUrl = window.location.origin + window.location.pathname;
   await window.sb.auth.signInWithOAuth({
     provider: 'google',
-    options: { redirectTo: window.location.href },
+    options: { redirectTo: cleanUrl },
   });
 });
 
@@ -74,5 +76,45 @@ async function evaluateSession() {
   }
 }
 
-evaluateSession();
-window.sb.auth.onAuthStateChange(() => evaluateSession());
+function showLoggingIn() {
+  gate.classList.remove('hidden');
+  authMsg.textContent = 'Loggar in…';
+  authMsg.classList.remove('error');
+  loginBtn.classList.add('hidden');
+  logoutBtn.classList.add('hidden');
+}
+
+function showError(text) {
+  gate.classList.remove('hidden');
+  authMsg.textContent = text;
+  authMsg.classList.add('error');
+  loginBtn.classList.remove('hidden');
+  logoutBtn.classList.add('hidden');
+}
+
+// Växlar in ?code= från Google-redirekten till en session och rensar adressen.
+async function handleOAuthRedirect() {
+  const url = new URL(window.location.href);
+  const code = url.searchParams.get('code');
+  if (!code) return;
+  showLoggingIn();
+  const { error } = await window.sb.auth.exchangeCodeForSession(code);
+  url.searchParams.delete('code');
+  window.history.replaceState({}, document.title, url.pathname + url.search + url.hash);
+  if (error) {
+    console.error('Inloggningsfel:', error);
+    showError('Inloggningen kunde inte slutföras. Tryck och försök igen.');
+  }
+}
+
+async function start() {
+  await handleOAuthRedirect();
+  await evaluateSession();
+}
+
+start();
+window.sb.auth.onAuthStateChange((event) => {
+  // start() sköter initialläget; reagera bara på senare ändringar.
+  if (event === 'INITIAL_SESSION') return;
+  evaluateSession();
+});
