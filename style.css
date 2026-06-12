@@ -301,6 +301,32 @@ main {
   font-size: 0.92rem;
 }
 
+/* Inloggningsruta */
+.auth-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: var(--cream);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.auth-gate.hidden { display: none; }
+.auth-box {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  padding: 32px 24px;
+  width: 100%;
+  max-width: 360px;
+  text-align: center;
+}
+.auth-logo { width: 96px; height: 96px; border-radius: 22px; }
+.auth-msg { color: var(--muted); margin: 18px 0 20px; }
+.auth-msg.error { color: var(--red); }
+
 .warning {
   background: var(--red-bg);
   border: 1px solid var(--red);

@@ -8,8 +8,20 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script defer src="auth.js"></script>
 </head>
 <body>
+  <div id="auth-gate" class="auth-gate">
+    <div class="auth-box">
+      <img src="icon.svg" alt="" class="auth-logo">
+      <p id="auth-msg" class="auth-msg">Logga in för att fortsätta.</p>
+      <button id="google-login" class="btn btn-primary btn-block">Logga in med Google</button>
+      <button id="auth-logout" class="btn btn-block hidden">Logga ut</button>
+    </div>
+  </div>
+
   <header class="app-header">
     <svg class="logo-shell" viewBox="0 0 48 48" aria-hidden="true">
       <path d="M24 6C13 6 6 15 6 24c0 10 8 18 18 18s18-8 18-18C42 15 35 6 24 6Zm0 4c1.2 4 2 9 2 14 0 6-1 12-2 16-1-4-2-10-2-16 0-5 .8-10 2-14Zm-6.5 2.2c-.8 3.6-1.5 8-1.5 11.8 0 5.5 1.2 11.2 2.6 15.1-4-2-7-5.5-8.2-9.8-.6-2.3-.5-4.8.3-7.2 1.2-3.9 3.7-7.4 6.8-9.9Zm13 0c3.1 2.5 5.6 6 6.8 9.9.8 2.4.9 4.9.3 7.2-1.2 4.3-4.2 7.8-8.2 9.8 1.4-3.9 2.6-9.6 2.6-15.1 0-3.8-.7-8.2-1.5-11.8Z" fill="currentColor"/>
