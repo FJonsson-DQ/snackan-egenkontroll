@@ -18,6 +18,12 @@ const authMsg = document.getElementById('auth-msg');
 const loginBtn = document.getElementById('google-login');
 const logoutBtn = document.getElementById('auth-logout');
 
+// Optimistiskt: finns redan en sparad session, dölj rutan direkt så den inte
+// blinkar förbi vid omladdning. evaluateSession bekräftar strax efter.
+try {
+  if (localStorage.getItem(window.sb.auth.storageKey)) gate.classList.add('hidden');
+} catch (e) {}
+
 function showLogin() {
   gate.classList.remove('hidden');
   authMsg.textContent = 'Logga in för att fortsätta.';
