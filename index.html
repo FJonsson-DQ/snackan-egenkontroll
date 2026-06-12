@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#447144">
+  <title>Snäckan – Egenkontroll</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="app-header">
+    <svg class="logo-shell" viewBox="0 0 48 48" aria-hidden="true">
+      <path d="M24 6C13 6 6 15 6 24c0 10 8 18 18 18s18-8 18-18C42 15 35 6 24 6Zm0 4c1.2 4 2 9 2 14 0 6-1 12-2 16-1-4-2-10-2-16 0-5 .8-10 2-14Zm-6.5 2.2c-.8 3.6-1.5 8-1.5 11.8 0 5.5 1.2 11.2 2.6 15.1-4-2-7-5.5-8.2-9.8-.6-2.3-.5-4.8.3-7.2 1.2-3.9 3.7-7.4 6.8-9.9Zm13 0c3.1 2.5 5.6 6 6.8 9.9.8 2.4.9 4.9.3 7.2-1.2 4.3-4.2 7.8-8.2 9.8 1.4-3.9 2.6-9.6 2.6-15.1 0-3.8-.7-8.2-1.5-11.8Z" fill="currentColor"/>
+    </svg>
+    <div class="header-text">
+      <h1>Snäckan</h1>
+      <span class="header-sub">Egenkontroll</span>
+    </div>
+  </header>
+
+  <main>
+    <!-- Vy: Enheter -->
+    <section id="view-units" class="view">
+      <button class="btn btn-accent btn-block btn-weekly hidden" id="weekly-btn">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2Z" fill="currentColor"/></svg>
+        Starta veckokontroll
+      </button>
+      <div class="view-head">
+        <h2>Enheter</h2>
+        <button class="btn btn-primary" id="add-unit-btn">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5Z" fill="currentColor"/></svg>
+          Lägg till
+        </button>
+      </div>
+      <div id="units-list" class="card-list"></div>
+      <p id="units-empty" class="empty-msg hidden">
+        Inga enheter än.<br>Tryck på "Lägg till" för att skapa din första kyl eller frys.
+      </p>
+    </section>
+
+    <!-- Vy: Logga temp -->
+    <section id="view-log" class="view hidden">
+      <div id="weekly-banner" class="weekly-banner hidden">
+        <div class="weekly-progress" id="weekly-progress"></div>
+        <button type="button" class="btn-link" id="weekly-skip">Hoppa över</button>
+        <button type="button" class="btn-link" id="weekly-quit">Avbryt</button>
+      </div>
+      <div class="view-head"><h2 id="log-title">Logga temperatur</h2></div>
+      <form id="log-form" class="form">
+        <label id="log-unit-label">
+          Enhet
+          <select id="log-unit" required></select>
+        </label>
+        <label>
+          Temperatur (°C)
+          <div class="temp-row">
+            <button type="button" class="btn btn-step" id="temp-minus" aria-label="Minska">−</button>
+            <input id="log-temp" type="number" step="0.1" inputmode="decimal" required>
+            <button type="button" class="btn btn-step" id="temp-plus" aria-label="Öka">+</button>
+          </div>
+        </label>
+        <div id="temp-chips" class="chips"></div>
+        <label>
+          Anteckning (frivillig)
+          <textarea id="log-note" rows="2" placeholder="T.ex. avfrostning pågår, åtgärd vidtagen"></textarea>
+        </label>
+        <div id="log-warning" class="warning hidden"></div>
+        <button type="submit" class="btn btn-primary btn-block" id="log-save">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2Z" fill="currentColor"/></svg>
+          Spara loggning
+        </button>
+      </form>
+    </section>
+
+    <!-- Vy: Historik -->
+    <section id="view-history" class="view hidden">
+      <div class="view-head"><h2>Historik</h2></div>
+      <label class="form">
+        Enhet
+        <select id="history-unit"></select>
+      </label>
+      <div class="history-actions">
+        <button class="btn" id="export-btn">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M12 3v10.2l3.6-3.6L17 11l-5 5-5-5 1.4-1.4L12 13.2V3Zm-7 15h14v2H5v-2Z" fill="currentColor"/></svg>
+          Exportera (CSV)
+        </button>
+      </div>
+      <div id="history-list" class="card-list"></div>
+      <p id="history-empty" class="empty-msg hidden">Inga loggningar för den här enheten än.</p>
+    </section>
+  </main>
+
+  <!-- Nedre navigering -->
+  <nav class="bottom-nav">
+    <button class="nav-btn active" data-view="units">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm0 2v6h10V4H7Zm0 8v8h10v-8H7Zm2-6h2v3H9V6Zm0 8h2v4H9v-4Z" fill="currentColor"/></svg>
+      Enheter
+    </button>
+    <button class="nav-btn" data-view="log">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 1 3 3v8.3a5 5 0 1 1-6 0V5a3 3 0 0 1 3-3Zm0 2a1 1 0 0 0-1 1v9.4l-.5.3a3 3 0 1 0 3 0l-.5-.3V5a1 1 0 0 0-1-1Zm1 4h3v1.5h-3V8Zm0 3h3v1.5h-3V11Z" fill="currentColor"/></svg>
+      Logga
+    </button>
+    <button class="nav-btn" data-view="history">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M12 4a8 8 0 1 1-7.7 10.2l1.9-.6A6 6 0 1 0 6.3 9H9v2H3V5h2v2.3A8 8 0 0 1 12 4Zm-1 4h2v4.6l3.2 1.9-1 1.7L11 13.7V8Z" fill="currentColor"/></svg>
+      Historik
+    </button>
+  </nav>
+
+  <!-- Modal: lägg till / redigera enhet -->
+  <div id="unit-modal" class="modal hidden">
+    <div class="modal-box">
+      <h2 id="unit-modal-title">Ny enhet</h2>
+      <form id="unit-form" class="form">
+        <input type="hidden" id="unit-id">
+        <label>
+          Namn
+          <input id="unit-name" type="text" placeholder="T.ex. Kyl 1 – grönsaker" required>
+        </label>
+        <label>
+          Typ
+          <div class="seg" id="unit-type-seg">
+            <button type="button" class="seg-btn active" data-type="kyl">Kyl</button>
+            <button type="button" class="seg-btn" data-type="frys">Frys</button>
+          </div>
+          <input type="hidden" id="unit-type" value="kyl">
+        </label>
+        <label>
+          Gränsvärde, max °C
+          <input id="unit-max" type="number" step="0.1" inputmode="decimal" required>
+          <small class="hint">Loggar över detta värde markeras rött. Riktvärde: kyl ca 8, frys ca -18.</small>
+        </label>
+        <div class="modal-actions">
+          <button type="button" class="btn" id="unit-cancel">Avbryt</button>
+          <button type="submit" class="btn btn-primary">Spara</button>
+        </div>
+      </form>
+      <button type="button" class="btn btn-danger btn-block hidden" id="unit-delete">Ta bort enhet</button>
+    </div>
+  </div>
+
+  <!-- Toast-meddelande -->
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

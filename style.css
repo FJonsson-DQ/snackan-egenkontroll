@@ -1,0 +1,400 @@
+:root {
+  /* Färger inspirerade av Konditori Snäckan – hav, grönt och kräm */
+  --green-deep: #447144;
+  --green-dark: #355c36;
+  --seafoam: #79c8a1;
+  --seafoam-soft: #e3f2ea;
+  --sage: #77806f;
+  --caramel: #c59764;
+  --cream: #faf6ef;
+  --card: #fffdf9;
+  --text: #2b2e2a;
+  --muted: #767e74;
+  --border: #e6e0d4;
+  --red: #c0392b;
+  --red-bg: #fdf0ee;
+  --radius: 14px;
+  --shadow: 0 1px 3px rgba(43, 46, 42, 0.08);
+  --serif: Georgia, "Times New Roman", serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--cream);
+  color: var(--text);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  /* Plats för nedre nav */
+  padding-bottom: 84px;
+}
+
+/* ------- Header ------- */
+.app-header {
+  background: var(--green-deep);
+  color: #fdfbf6;
+  padding: env(safe-area-inset-top) 16px 0;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.logo-shell {
+  width: 34px;
+  height: 34px;
+  color: var(--seafoam);
+  flex: none;
+  margin: 10px 0;
+}
+.header-text { padding: 10px 0; }
+.app-header h1 {
+  font-family: var(--serif);
+  font-size: 1.35rem;
+  letter-spacing: 0.06em;
+  margin: 0;
+  line-height: 1.1;
+}
+.header-sub {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  color: var(--seafoam);
+}
+
+main {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.view-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 14px 0 12px;
+}
+.view-head h2 {
+  font-family: var(--serif);
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.hidden { display: none !important; }
+
+/* ------- Knappar ------- */
+.btn {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  font-size: 1rem;
+  padding: 12px 16px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: var(--shadow);
+}
+.btn:active { transform: scale(0.98); }
+.btn-primary {
+  background: var(--green-deep);
+  border-color: var(--green-deep);
+  color: #fff;
+}
+.btn-primary:active { background: var(--green-dark); }
+.btn-accent {
+  background: var(--seafoam-soft);
+  border-color: var(--seafoam);
+  color: var(--green-deep);
+  font-weight: 600;
+}
+.btn-danger {
+  background: var(--card);
+  border-color: var(--red);
+  color: var(--red);
+}
+.btn-block { width: 100%; }
+.btn-weekly { margin-top: 4px; }
+.btn .icon { width: 20px; height: 20px; flex: none; }
+
+.btn-link {
+  appearance: none;
+  border: none;
+  background: none;
+  color: var(--green-deep);
+  text-decoration: underline;
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 8px;
+}
+
+/* ------- Kort-lista ------- */
+.card-list { display: flex; flex-direction: column; gap: 12px; }
+
+.unit-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.unit-card .type-icon {
+  width: 38px;
+  height: 38px;
+  flex: none;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--seafoam-soft);
+  color: var(--green-deep);
+}
+.unit-card .type-icon svg { width: 22px; height: 22px; }
+.unit-card .type-icon.frys { background: #e8f0f7; color: #3c6e9f; }
+.unit-card .info { min-width: 0; flex: 1; }
+.unit-card .name { font-weight: 600; }
+.unit-card .meta { color: var(--muted); font-size: 0.85rem; margin-top: 2px; }
+.unit-card .edit-link {
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin-top: 4px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.unit-card .reading {
+  text-align: right;
+  white-space: nowrap;
+  cursor: pointer;
+  padding: 4px 0 4px 8px;
+}
+.unit-card .temp { font-size: 1.3rem; font-weight: 700; }
+.unit-card .temp.ok { color: var(--green-deep); }
+.unit-card .temp.bad { color: var(--red); }
+.unit-card .temp.none { color: var(--muted); font-size: 0.95rem; font-weight: 500; }
+.unit-card .log-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--caramel);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.unit-card .log-hint svg { width: 14px; height: 14px; }
+
+/* ------- Historik-rader ------- */
+.reading-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 12px 14px;
+}
+.reading-card.bad { border-color: var(--red); background: var(--red-bg); }
+.reading-card .row { display: flex; justify-content: space-between; gap: 8px; }
+.reading-card .when { color: var(--muted); font-size: 0.85rem; }
+.reading-card .val { font-weight: 700; }
+.reading-card .val.bad { color: var(--red); }
+.reading-card .note { margin-top: 6px; font-size: 0.9rem; color: var(--text); }
+
+/* ------- Formulär ------- */
+.form { display: flex; flex-direction: column; gap: 14px; }
+.form label { display: flex; flex-direction: column; gap: 6px; font-size: 0.9rem; color: var(--muted); }
+.form input, .form select, .form textarea {
+  font-size: 1.05rem;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--text);
+  min-height: 48px;
+}
+.form textarea { min-height: 60px; resize: vertical; }
+.hint { color: var(--muted); font-size: 0.78rem; }
+
+/* Temperatur-rad med +/- */
+.temp-row { display: flex; gap: 10px; align-items: stretch; }
+.temp-row input {
+  flex: 1;
+  text-align: center;
+  font-size: 1.5rem;
+  font-weight: 700;
+  min-width: 0;
+}
+.btn-step {
+  flex: none;
+  width: 56px;
+  font-size: 1.5rem;
+  font-weight: 600;
+  padding: 0;
+  color: var(--green-deep);
+}
+
+/* Snabbval-chips */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  appearance: none;
+  border: 1px solid var(--seafoam);
+  background: var(--seafoam-soft);
+  color: var(--green-deep);
+  font-size: 0.95rem;
+  font-weight: 600;
+  padding: 10px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  min-height: 44px;
+}
+.chip:active { transform: scale(0.96); }
+.chip.last { border-color: var(--caramel); background: #f8efe3; color: #8a6438; }
+
+/* Veckokontroll-banner */
+.weekly-banner {
+  background: var(--seafoam-soft);
+  border: 1px solid var(--seafoam);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.weekly-progress {
+  flex: 1;
+  font-weight: 600;
+  color: var(--green-deep);
+  font-size: 0.92rem;
+}
+
+.history-actions { margin: 12px 0; }
+
+.warning {
+  background: var(--red-bg);
+  border: 1px solid var(--red);
+  color: var(--red);
+  padding: 12px;
+  border-radius: 10px;
+  font-size: 0.9rem;
+}
+
+.empty-msg { color: var(--muted); text-align: center; padding: 32px 16px; line-height: 1.5; }
+
+/* ------- Nedre navigering ------- */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--card);
+  border-top: 1px solid var(--border);
+  display: flex;
+  padding-bottom: env(safe-area-inset-bottom);
+  z-index: 10;
+}
+.nav-btn {
+  flex: 1;
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 10px 0 12px;
+  font-size: 0.78rem;
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+.nav-btn .icon { width: 24px; height: 24px; }
+.nav-btn.active { color: var(--green-deep); font-weight: 600; }
+
+/* ------- Segmentknapp (Kyl/Frys) ------- */
+.seg {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.seg-btn {
+  flex: 1;
+  appearance: none;
+  border: none;
+  background: var(--card);
+  color: var(--muted);
+  font-size: 1rem;
+  padding: 12px;
+  cursor: pointer;
+  min-height: 48px;
+}
+.seg-btn.active {
+  background: var(--green-deep);
+  color: #fff;
+  font-weight: 600;
+}
+
+/* ------- Modal ------- */
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(43, 46, 42, 0.45);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 20;
+}
+.modal-box {
+  background: var(--card);
+  width: 100%;
+  max-width: 480px;
+  border-radius: 16px 16px 0 0;
+  padding: 20px 16px calc(20px + env(safe-area-inset-bottom));
+  max-height: 90vh;
+  overflow-y: auto;
+}
+.modal-box h2 {
+  margin-top: 0;
+  font-family: var(--serif);
+  font-size: 1.2rem;
+}
+.modal-actions { display: flex; gap: 10px; }
+.modal-actions .btn { flex: 1; }
+#unit-delete { margin-top: 12px; }
+
+@media (min-width: 600px) {
+  .modal { align-items: center; }
+  .modal-box { border-radius: 16px; }
+}
+
+/* ------- Toast ------- */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 96px;
+  transform: translateX(-50%);
+  background: var(--green-deep);
+  color: #fff;
+  padding: 12px 20px;
+  border-radius: 999px;
+  font-size: 0.95rem;
+  box-shadow: 0 4px 16px rgba(43, 46, 42, 0.25);
+  z-index: 30;
+  max-width: 90vw;
+  text-align: center;
+  animation: toast-in 0.25s ease;
+}
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(8px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
