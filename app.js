@@ -138,36 +138,36 @@ function renderUnits() {
     if (latest) {
       const bad = isOutOfRange(latest.temp, unit.maxTemp);
       readingHtml = `<div class="temp ${bad ? 'bad' : 'ok'}">${latest.temp}°C</div>
-        <div class="meta">${formatDateTime(latest.tidpunkt)}</div>
-        <span class="log-hint">${ICONS.thermo} Logga ny</span>`;
+        <div class="meta">${formatDateTime(latest.tidpunkt)}</div>`;
     } else {
-      readingHtml = `<div class="temp none">Ingen logg</div>
-        <span class="log-hint">${ICONS.thermo} Logga ny</span>`;
+      readingHtml = `<div class="temp none">Ingen logg</div>`;
     }
 
+    // Hela kortet redigerar; "Logga ny"-knappen loggar (egen träffyta).
+    card.setAttribute('role', 'button');
     card.innerHTML = `
       <div class="type-icon ${unit.typ}">${ICONS[unit.typ] || ICONS.kyl}</div>
       <div class="info">
         <div class="name">${escapeHtml(unit.namn)}</div>
-        <div class="meta">${unit.typ === 'kyl' ? 'Kyl' : 'Frys'} · max ${unit.maxTemp}°C</div>
-        <div class="edit-link" data-edit="${unit.id}">Redigera</div>
+        <div class="meta">${unit.typ === 'kyl' ? 'Kyl' : 'Frys'} · max ${unit.maxTemp}°C · redigera</div>
       </div>
-      <div class="reading" data-log="${unit.id}">${readingHtml}</div>
+      <div class="reading">${readingHtml}</div>
+      <button type="button" class="btn-log" data-log="${unit.id}">
+        ${ICONS.thermo}<span>Logga ny</span>
+      </button>
     `;
     list.appendChild(card);
-  });
 
-  // Klick på temperatur-delen öppnar loggning för den enheten.
-  list.querySelectorAll('[data-log]').forEach(el => {
-    el.addEventListener('click', () => {
+    // Klick var som helst på kortet öppnar redigering.
+    card.addEventListener('click', () => openUnitModal(unit.id));
+
+    // "Logga ny"-knappen loggar i stället, utan att trigga redigering.
+    card.querySelector('[data-log]').addEventListener('click', (e) => {
+      e.stopPropagation();
       showView('log');
-      $('#log-unit').value = el.dataset.log;
+      $('#log-unit').value = unit.id;
       onLogUnitChange();
     });
-  });
-  // Klick på "Redigera" öppnar modalen.
-  list.querySelectorAll('[data-edit]').forEach(el => {
-    el.addEventListener('click', () => openUnitModal(el.dataset.edit));
   });
 }
 
@@ -329,13 +329,22 @@ function fillUnitSelect(select) {
     opt.textContent = u.namn;
     select.appendChild(opt);
   });
-  if (current) select.value = current;
+  // Behåll tidigare val om det finns kvar, annars välj första enheten.
+  if (current && units.some(u => u.id === current)) {
+    select.value = current;
+  } else if (units.length > 0) {
+    select.selectedIndex = 0;
+  }
   return units.length > 0;
 }
 
 function renderLogForm() {
   const hasUnits = fillUnitSelect($('#log-unit'));
   $('#log-form').classList.toggle('hidden', !hasUnits);
+  // Stega-knapparna är bara meningsfulla med fler än en enhet.
+  const multi = $('#log-unit').options.length > 1;
+  $('#unit-prev').disabled = !multi;
+  $('#unit-next').disabled = !multi;
   updateWeeklyBanner();
   if (!hasUnits) {
     $('#log-warning').textContent = 'Lägg till en enhet först (under fliken Enheter).';
@@ -349,18 +358,27 @@ function renderLogForm() {
 function renderTempChips() {
   const wrap = $('#temp-chips');
   wrap.innerHTML = '';
+  const hint = $('#temp-limit-hint');
   const unit = Store.getUnits().find(u => u.id === $('#log-unit').value);
-  if (!unit) return;
+  if (!unit) { hint.textContent = ''; return; }
+
+  hint.textContent = `Gränsvärde: max ${unit.maxTemp}°C`;
 
   const values = [];
+  const seen = new Set();
   const latest = Store.latestReading(unit.id);
-  if (latest !== null && latest !== undefined) {
+  if (latest) {
     values.push({ temp: latest.temp, label: `Senast: ${latest.temp}°`, last: true });
+    seen.add(Number(latest.temp));
   }
-  const typical = unit.typ === 'frys' ? [-22, -20, -18] : [2, 4, 6, 8];
+  // Helt intervall av rimliga värden för enhetstypen.
+  const typical = unit.typ === 'frys'
+    ? [-25, -24, -23, -22, -21, -20, -19, -18]
+    : [1, 2, 3, 4, 5, 6, 7, 8];
   typical.forEach(t => {
-    if (!latest || Number(latest.temp) !== t) {
+    if (!seen.has(t)) {
       values.push({ temp: t, label: `${t}°`, last: false });
+      seen.add(t);
     }
   });
 
@@ -368,16 +386,35 @@ function renderTempChips() {
     const chip = document.createElement('button');
     chip.type = 'button';
     chip.className = 'chip' + (v.last ? ' last' : '');
+    chip.dataset.temp = v.temp;
     chip.textContent = v.label;
     chip.addEventListener('click', () => {
       $('#log-temp').value = v.temp;
-      updateLogWarning();
+      onTempChanged();
     });
     wrap.appendChild(chip);
   });
+  highlightSelectedChip();
+}
+
+// Markera det snabbval som matchar inskrivet värde.
+function highlightSelectedChip() {
+  const val = $('#log-temp').value;
+  document.querySelectorAll('#temp-chips .chip').forEach(c => {
+    c.classList.toggle('selected', val !== '' && Number(c.dataset.temp) === Number(val));
+  });
+}
+
+function onTempChanged() {
+  updateLogWarning();
+  highlightSelectedChip();
 }
 
 function onLogUnitChange() {
+  // Förifyll med senaste loggade värdet (kyl/frys ändras sällan mycket).
+  const unit = Store.getUnits().find(u => u.id === $('#log-unit').value);
+  const latest = unit ? Store.latestReading(unit.id) : null;
+  $('#log-temp').value = latest ? latest.temp : '';
   renderTempChips();
   updateLogWarning();
 }
@@ -400,12 +437,25 @@ function stepTemp(delta) {
   if (Number.isNaN(current)) return;
   const next = Math.round((current + delta) * 10) / 10;
   input.value = next;
-  updateLogWarning();
+  onTempChanged();
 }
 
 $('#temp-minus').addEventListener('click', () => stepTemp(-0.5));
 $('#temp-plus').addEventListener('click', () => stepTemp(0.5));
-$('#log-temp').addEventListener('input', updateLogWarning);
+$('#log-temp').addEventListener('input', onTempChanged);
+
+// Stega mellan enheter med −/+ (slår runt i listan). Dropdownen fungerar kvar.
+function stepUnit(delta) {
+  const select = $('#log-unit');
+  const n = select.options.length;
+  if (n < 2) return;
+  const next = (select.selectedIndex + delta + n) % n;
+  select.selectedIndex = next;
+  onLogUnitChange();
+}
+
+$('#unit-prev').addEventListener('click', () => stepUnit(-1));
+$('#unit-next').addEventListener('click', () => stepUnit(1));
 $('#log-unit').addEventListener('change', onLogUnitChange);
 
 $('#log-form').addEventListener('submit', (e) => {

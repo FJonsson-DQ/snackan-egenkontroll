@@ -51,7 +51,11 @@
       <form id="log-form" class="form">
         <label id="log-unit-label">
           Enhet
-          <select id="log-unit" required></select>
+          <div class="temp-row">
+            <button type="button" class="btn btn-step" id="unit-prev" aria-label="Föregående enhet">−</button>
+            <select id="log-unit" required></select>
+            <button type="button" class="btn btn-step" id="unit-next" aria-label="Nästa enhet">+</button>
+          </div>
         </label>
         <label>
           Temperatur (°C)
@@ -62,6 +66,7 @@
           </div>
         </label>
         <div id="temp-chips" class="chips"></div>
+        <small id="temp-limit-hint" class="hint limit-hint"></small>
         <label>
           Anteckning (frivillig)
           <textarea id="log-note" rows="2" placeholder="T.ex. avfrostning pågår, åtgärd vidtagen"></textarea>
@@ -76,17 +81,17 @@
 
     <!-- Vy: Historik -->
     <section id="view-history" class="view hidden">
-      <div class="view-head"><h2>Historik</h2></div>
-      <label class="form">
-        Enhet
-        <select id="history-unit"></select>
-      </label>
-      <div class="history-actions">
+      <div class="view-head">
+        <h2>Historik</h2>
         <button class="btn" id="export-btn">
           <svg class="icon" viewBox="0 0 24 24"><path d="M12 3v10.2l3.6-3.6L17 11l-5 5-5-5 1.4-1.4L12 13.2V3Zm-7 15h14v2H5v-2Z" fill="currentColor"/></svg>
           Exportera (CSV)
         </button>
       </div>
+      <label class="form">
+        Enhet
+        <select id="history-unit"></select>
+      </label>
       <div id="history-list" class="card-list"></div>
       <p id="history-empty" class="empty-msg hidden">Inga loggningar för den här enheten än.</p>
     </section>
