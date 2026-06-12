@@ -132,6 +132,44 @@ function escapeHtml(str) {
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+// Måndag 00:00 för veckan som datumet ligger i.
+function startOfWeek(date) {
+  const x = new Date(date);
+  x.setHours(0, 0, 0, 0);
+  const mondayOffset = (x.getDay() + 6) % 7; // söndag=0 → 6, måndag=1 → 0
+  x.setDate(x.getDate() - mondayOffset);
+  return x;
+}
+function isThisWeek(iso) {
+  const start = startOfWeek(new Date());
+  const end = new Date(start);
+  end.setDate(end.getDate() + 7);
+  const d = new Date(iso);
+  return d >= start && d < end;
+}
+function relativeTime(iso) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const that = new Date(iso); that.setHours(0, 0, 0, 0);
+  const days = Math.round((today - that) / 86400000);
+  if (days <= 0) return 'idag';
+  if (days === 1) return 'igår';
+  if (days < 14) return `${days} dagar sedan`;
+  return new Date(iso).toLocaleDateString('sv-SE');
+}
+// 'bad' = senaste värdet över gränsen, 'due' = ej loggad denna vecka, 'ok' annars.
+function unitStatus(unit) {
+  const latest = Store.latestReading(unit.id);
+  if (latest && isOutOfRange(latest.temp, unit.maxTemp)) return 'bad';
+  if (!latest || !isThisWeek(latest.tidpunkt)) return 'due';
+  return 'ok';
+}
+const STATUS_TEXT = {
+  ok: '✓ Loggad denna vecka',
+  due: 'Behöver loggas denna vecka',
+  bad: '⚠ Senaste värdet över gränsen',
+};
+const PENCIL_SVG = '<svg class="edit-pencil" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17.25V21h3.75L17.8 9.94l-3.75-3.75L3 17.25ZM20.7 7a1 1 0 0 0 0-1.4l-2.3-2.3a1 1 0 0 0-1.4 0l-1.8 1.8 3.75 3.75L20.7 7Z" fill="currentColor"/></svg>';
+
 let toastTimer = null;
 function showToast(msg) {
   const t = $('#toast');
@@ -172,16 +210,21 @@ function renderUnits() {
   $('#units-empty').classList.toggle('hidden', units.length > 0);
   $('#weekly-btn').classList.toggle('hidden', units.length === 0);
 
+  renderUnitsStatus(units);
+
   units.forEach(unit => {
     const latest = Store.latestReading(unit.id);
+    const status = unitStatus(unit);
     const card = document.createElement('div');
-    card.className = 'unit-card';
+    card.className = `unit-card status-${status}`;
 
     let readingHtml;
     if (latest) {
       const bad = isOutOfRange(latest.temp, unit.maxTemp);
+      const who = latest.loggad_av ? latest.loggad_av.split('@')[0] : '';
       readingHtml = `<div class="temp ${bad ? 'bad' : 'ok'}">${latest.temp}°C</div>
-        <div class="meta">${formatDateTime(latest.tidpunkt)}</div>`;
+        <div class="meta">${relativeTime(latest.tidpunkt)}</div>
+        ${who ? `<span class="who">${escapeHtml(who)}</span>` : ''}`;
     } else {
       readingHtml = `<div class="temp none">Ingen logg</div>`;
     }
@@ -191,8 +234,9 @@ function renderUnits() {
     card.innerHTML = `
       <div class="type-icon ${unit.typ}">${ICONS[unit.typ] || ICONS.kyl}</div>
       <div class="info">
-        <div class="name">${escapeHtml(unit.namn)}</div>
-        <div class="meta">${unit.typ === 'kyl' ? 'Kyl' : 'Frys'} · max ${unit.maxTemp}°C · redigera</div>
+        <div class="name-row"><span class="name">${escapeHtml(unit.namn)}</span>${PENCIL_SVG}</div>
+        <div class="meta">${unit.typ === 'kyl' ? 'Kyl' : 'Frys'} · max ${unit.maxTemp}°C</div>
+        <div class="unit-status ${status}">${STATUS_TEXT[status]}</div>
       </div>
       <div class="reading">${readingHtml}</div>
       <button type="button" class="btn-log" data-log="${unit.id}">
@@ -212,6 +256,41 @@ function renderUnits() {
       onLogUnitChange();
     });
   });
+}
+
+// Statusbannrar: avvikelser (rött) och veckans framsteg.
+function renderUnitsStatus(units) {
+  const alert = $('#deviation-alert');
+  const summary = $('#weekly-summary');
+
+  if (units.length === 0) {
+    alert.classList.add('hidden');
+    summary.classList.add('hidden');
+    return;
+  }
+
+  const deviations = units.filter(u => unitStatus(u) === 'bad').length;
+  if (deviations > 0) {
+    alert.textContent = deviations === 1
+      ? '⚠ 1 enhet över gränsvärdet'
+      : `⚠ ${deviations} enheter över gränsvärdet`;
+    alert.classList.remove('hidden');
+  } else {
+    alert.classList.add('hidden');
+  }
+
+  const logged = units.filter(u => {
+    const latest = Store.latestReading(u.id);
+    return latest && isThisWeek(latest.tidpunkt);
+  }).length;
+  summary.classList.remove('hidden');
+  if (logged === units.length) {
+    summary.className = 'status-banner success';
+    summary.textContent = '✓ Alla enheter loggade denna vecka';
+  } else {
+    summary.className = 'status-banner info';
+    summary.textContent = `${logged} av ${units.length} enheter loggade denna vecka`;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -461,13 +540,19 @@ function onLogUnitChange() {
 
 function updateLogWarning() {
   const warn = $('#log-warning');
+  const noteLabel = $('#note-label');
   const unit = Store.getUnits().find(u => u.id === $('#log-unit').value);
   const temp = $('#log-temp').value;
-  if (unit && temp !== '' && isOutOfRange(temp, unit.maxTemp)) {
-    warn.textContent = `Varning: ${temp}°C är över gränsvärdet (max ${unit.maxTemp}°C för ${unit.namn}). Loggningen sparas men avvikelsen bör åtgärdas och antecknas.`;
+  const outOfRange = unit && temp !== '' && isOutOfRange(temp, unit.maxTemp);
+  if (outOfRange) {
+    warn.textContent = `Varning: ${temp}°C är över gränsvärdet (max ${unit.maxTemp}°C för ${unit.namn}). Skriv vilken åtgärd som vidtogs innan du sparar.`;
     warn.classList.remove('hidden');
+    noteLabel.textContent = 'Åtgärd vid avvikelse (obligatorisk)';
+    noteLabel.classList.add('required');
   } else {
     warn.classList.add('hidden');
+    noteLabel.textContent = 'Anteckning (frivillig)';
+    noteLabel.classList.remove('required');
   }
 }
 
@@ -503,6 +588,15 @@ $('#log-form').addEventListener('submit', async (e) => {
   const unitId = $('#log-unit').value;
   const temp = parseFloat($('#log-temp').value);
   if (!unitId || Number.isNaN(temp)) return;
+
+  // Vid avvikelse krävs en åtgärdsnotering innan loggen kan sparas.
+  const unit = Store.getUnits().find(u => u.id === unitId);
+  const note = $('#log-note').value.trim();
+  if (unit && isOutOfRange(temp, unit.maxTemp) && !note) {
+    showToast('Skriv vilken åtgärd som vidtogs');
+    $('#log-note').focus();
+    return;
+  }
 
   const saveBtn = $('#log-save');
   saveBtn.disabled = true;
@@ -583,18 +677,15 @@ $('#history-unit').addEventListener('change', renderHistoryList);
 // ---------------------------------------------------------------------------
 // Export till CSV
 // ---------------------------------------------------------------------------
-$('#export-btn').addEventListener('click', () => {
-  const unitId = $('#history-unit').value;
-  const unit = Store.getUnits().find(u => u.id === unitId);
-  if (!unit) return;
-  const readings = Store.readingsForUnit(unitId);
-  if (readings.length === 0) {
-    showToast('Inget att exportera för den här enheten');
-    return;
-  }
+function unitsById() {
+  return Object.fromEntries(Store.getUnits().map(u => [u.id, u]));
+}
 
+function csvRowsFor(readings, byId) {
   const rows = [['Datum/tid', 'Enhet', 'Typ', 'Temp (C)', 'Max (C)', 'Avvikelse', 'Loggad av', 'Anteckning']];
   readings.forEach(r => {
+    const unit = byId[r.unitId];
+    if (!unit) return;
     rows.push([
       formatDateTime(r.tidpunkt),
       unit.namn,
@@ -606,23 +697,58 @@ $('#export-btn').addEventListener('click', () => {
       r.anteckning || '',
     ]);
   });
+  return rows;
+}
 
+function downloadCsv(rows, filename) {
   const csv = rows.map(row =>
     row.map(cell => '"' + String(cell).replace(/"/g, '""') + '"').join(';')
   ).join('\r\n');
-
-  // BOM så att Excel läser å/ä/ö rätt.
+  // BOM (﻿) så att Excel läser å/ä/ö rätt.
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  const safeName = unit.namn.replace(/[^\wåäöÅÄÖ -]/g, '').trim() || 'enhet';
   a.href = url;
-  a.download = `egenkontroll_${safeName}_${new Date().toISOString().slice(0, 10)}.csv`;
+  a.download = filename;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+function safeFileName(s) {
+  return s.replace(/[^\wåäöÅÄÖ -]/g, '').trim() || 'enhet';
+}
+
+const todayStamp = () => new Date().toISOString().slice(0, 10);
+
+$('#export-btn').addEventListener('click', () => {
+  const unitId = $('#history-unit').value;
+  const unit = Store.getUnits().find(u => u.id === unitId);
+  if (!unit) return;
+  const readings = Store.readingsForUnit(unitId);
+  if (readings.length === 0) {
+    showToast('Inget att exportera för den här enheten');
+    return;
+  }
+  downloadCsv(csvRowsFor(readings, unitsById()),
+    `egenkontroll_${safeFileName(unit.namn)}_${todayStamp()}.csv`);
   showToast('CSV-fil nedladdad');
+});
+
+$('#export-all-btn').addEventListener('click', () => {
+  const byId = unitsById();
+  const readings = Store.getReadings().slice().sort((a, b) => {
+    const na = (byId[a.unitId] && byId[a.unitId].namn) || '';
+    const nb = (byId[b.unitId] && byId[b.unitId].namn) || '';
+    return na.localeCompare(nb) || b.tidpunkt.localeCompare(a.tidpunkt);
+  });
+  if (readings.length === 0) {
+    showToast('Inget att exportera');
+    return;
+  }
+  downloadCsv(csvRowsFor(readings, byId), `egenkontroll_alla_${todayStamp()}.csv`);
+  showToast('CSV-fil nedladdad (alla enheter)');
 });
 
 // ---------------------------------------------------------------------------

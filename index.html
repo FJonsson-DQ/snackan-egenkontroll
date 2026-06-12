@@ -62,6 +62,8 @@
           Lägg till
         </button>
       </div>
+      <div id="deviation-alert" class="status-banner danger hidden"></div>
+      <div id="weekly-summary" class="status-banner hidden"></div>
       <div id="units-list" class="card-list"></div>
       <p id="units-empty" class="empty-msg hidden">
         Inga enheter än.<br>Tryck på "Lägg till" för att skapa din första kyl eller frys.
@@ -96,7 +98,7 @@
         <div id="temp-chips" class="chips"></div>
         <small id="temp-limit-hint" class="hint limit-hint"></small>
         <label>
-          Anteckning (frivillig)
+          <span id="note-label">Anteckning (frivillig)</span>
           <textarea id="log-note" rows="2" placeholder="T.ex. avfrostning pågår, åtgärd vidtagen"></textarea>
         </label>
         <div id="log-warning" class="warning hidden"></div>
@@ -111,10 +113,13 @@
     <section id="view-history" class="view hidden">
       <div class="view-head">
         <h2>Historik</h2>
-        <button class="btn" id="export-btn">
-          <svg class="icon" viewBox="0 0 24 24"><path d="M12 3v10.2l3.6-3.6L17 11l-5 5-5-5 1.4-1.4L12 13.2V3Zm-7 15h14v2H5v-2Z" fill="currentColor"/></svg>
-          Exportera (CSV)
-        </button>
+        <div class="export-group">
+          <button class="btn" id="export-btn">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M12 3v10.2l3.6-3.6L17 11l-5 5-5-5 1.4-1.4L12 13.2V3Zm-7 15h14v2H5v-2Z" fill="currentColor"/></svg>
+            Denna enhet
+          </button>
+          <button class="btn" id="export-all-btn">Alla</button>
+        </div>
       </div>
       <label class="form">
         Enhet

@@ -13,6 +13,8 @@
   --border: #e6e0d4;
   --red: #c0392b;
   --red-bg: #fdf0ee;
+  --amber: #b5803a;
+  --amber-bg: #fbf1e3;
   --input-bg: #ffffff;
   --radius: 14px;
   --shadow: 0 1px 3px rgba(43, 46, 42, 0.08);
@@ -34,6 +36,8 @@
   --border: #2e3631;
   --red: #e57165;
   --red-bg: #3a201d;
+  --amber: #d8ad6e;
+  --amber-bg: #322a1c;
   --input-bg: #232b27;
   --shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
 }
@@ -368,6 +372,41 @@ main {
 .auth-logo { width: 96px; height: 96px; border-radius: 22px; }
 .auth-msg { color: var(--muted); margin: 18px 0 20px; }
 .auth-msg.error { color: var(--red); }
+
+/* Statusbannrar på Enheter */
+.status-banner {
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.status-banner.hidden { display: none; }
+.status-banner.success { background: var(--seafoam-soft); color: var(--green-deep); }
+.status-banner.info { background: var(--amber-bg); color: var(--amber); }
+.status-banner.danger { background: var(--red-bg); color: var(--red); }
+
+/* Statusstrimma och status-text på enhetskort */
+.unit-card.status-ok { border-left: 4px solid var(--green-deep); }
+.unit-card.status-due { border-left: 4px solid var(--amber); }
+.unit-card.status-bad { border-left: 4px solid var(--red); }
+.unit-status { display: inline-block; margin-top: 4px; font-size: 0.75rem; font-weight: 600; }
+.unit-status.ok { color: var(--green-deep); }
+.unit-status.due { color: var(--amber); }
+.unit-status.bad { color: var(--red); }
+
+/* Penn-ikon vid enhetsnamnet (visuell hint; hela kortet redigerar) */
+.name-row { display: flex; align-items: center; gap: 6px; }
+.name-row .edit-pencil { width: 14px; height: 14px; color: var(--muted); flex: none; }
+
+/* Vem som loggade, på enhetskortet */
+.reading .who { display: block; font-size: 0.76rem; color: var(--muted); }
+
+/* Export-knappar bredvid varandra */
+.export-group { display: flex; gap: 8px; }
+
+/* Obligatorisk åtgärd vid avvikelse */
+#note-label.required { color: var(--red); }
 
 .warning {
   background: var(--red-bg);
