@@ -2,6 +2,25 @@
 // Ren JavaScript, sparar i webbläsarens localStorage.
 
 // ---------------------------------------------------------------------------
+// Mörkt/ljust läge. Temat sätts redan i <head> innan ritning; här sköts bara
+// växlingen och att valet sparas.
+// ---------------------------------------------------------------------------
+(function initThemeToggle() {
+  const btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  btn.addEventListener('click', () => {
+    const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    if (dark) {
+      document.documentElement.removeAttribute('data-theme');
+      localStorage.setItem('bowsapp.theme', 'light');
+    } else {
+      document.documentElement.setAttribute('data-theme', 'dark');
+      localStorage.setItem('bowsapp.theme', 'dark');
+    }
+  });
+})();
+
+// ---------------------------------------------------------------------------
 // Lagringslager. All läsning/skrivning av data går genom dessa funktioner,
 // så att lagringen senare kan bytas (t.ex. mot molnet) på ett ställe.
 // ---------------------------------------------------------------------------
