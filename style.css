@@ -276,7 +276,6 @@ main {
   min-height: 44px;
 }
 .chip:active { transform: scale(0.96); }
-.chip.last { border-color: var(--caramel); background: #f8efe3; color: #8a6438; }
 .chip.selected {
   background: var(--green-deep);
   border-color: var(--green-deep);

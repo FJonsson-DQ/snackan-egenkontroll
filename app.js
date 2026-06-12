@@ -354,7 +354,8 @@ function renderLogForm() {
   }
 }
 
-// Snabbval-chips: senaste loggade värdet + typiska värden för enhetstypen.
+// Snabbval-chips: typiska värden för enhetstypen. Senaste värdet förifylls
+// direkt i rutan, så det behövs inte som eget förslag här.
 function renderTempChips() {
   const wrap = $('#temp-chips');
   wrap.innerHTML = '';
@@ -364,32 +365,19 @@ function renderTempChips() {
 
   hint.textContent = `Gränsvärde: max ${unit.maxTemp}°C`;
 
-  const values = [];
-  const seen = new Set();
-  const latest = Store.latestReading(unit.id);
-  if (latest) {
-    values.push({ temp: latest.temp, label: `Senast: ${latest.temp}°`, last: true });
-    seen.add(Number(latest.temp));
-  }
   // Helt intervall av rimliga värden för enhetstypen.
   const typical = unit.typ === 'frys'
     ? [-25, -24, -23, -22, -21, -20, -19, -18]
     : [1, 2, 3, 4, 5, 6, 7, 8];
-  typical.forEach(t => {
-    if (!seen.has(t)) {
-      values.push({ temp: t, label: `${t}°`, last: false });
-      seen.add(t);
-    }
-  });
 
-  values.forEach(v => {
+  typical.forEach(t => {
     const chip = document.createElement('button');
     chip.type = 'button';
-    chip.className = 'chip' + (v.last ? ' last' : '');
-    chip.dataset.temp = v.temp;
-    chip.textContent = v.label;
+    chip.className = 'chip';
+    chip.dataset.temp = t;
+    chip.textContent = `${t}°`;
     chip.addEventListener('click', () => {
-      $('#log-temp').value = v.temp;
+      $('#log-temp').value = t;
       onTempChanged();
     });
     wrap.appendChild(chip);
