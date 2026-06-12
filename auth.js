@@ -42,6 +42,8 @@ function showNoAccess(email) {
 
 function showApp() {
   gate.classList.add('hidden');
+  // Starta appen (laddar data + realtid). onAppReady är skyddad mot dubbelkörning.
+  if (window.onAppReady) window.onAppReady();
 }
 
 loginBtn.addEventListener('click', async () => {
@@ -87,6 +89,7 @@ async function evaluateSession() {
   if (!session) { showLogin(); return; }
   const email = session.user.email;
   if (await isAllowed(email)) {
+    window.currentUserEmail = email;
     showApp();
   } else {
     showNoAccess(email);

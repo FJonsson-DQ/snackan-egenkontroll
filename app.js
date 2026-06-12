@@ -24,51 +24,34 @@
 // Lagringslager. All läsning/skrivning av data går genom dessa funktioner,
 // så att lagringen senare kan bytas (t.ex. mot molnet) på ett ställe.
 // ---------------------------------------------------------------------------
+// Lagringslagret pratar med Supabase men håller ett synkront minne (cache) så att
+// alla render-funktioner kan läsa data direkt. Skrivningar går till molnet och
+// laddar om cachen; realtidsprenumerationen håller cachen uppdaterad när ANDRA
+// användare ändrar något. Översätter mellan appens fält (maxTemp, unitId) och
+// databasens (max_temp, unit_id).
+function mapUnitFromDb(u) {
+  return { id: u.id, namn: u.namn, typ: u.typ, maxTemp: Number(u.max_temp) };
+}
+function mapReadingFromDb(r) {
+  return {
+    id: r.id,
+    unitId: r.unit_id,
+    temp: Number(r.temp),
+    anteckning: r.anteckning || '',
+    loggad_av: r.loggad_av || '',
+    tidpunkt: r.tidpunkt,
+  };
+}
+
 const Store = {
-  UNITS_KEY: 'bowsapp.units',
-  READINGS_KEY: 'bowsapp.readings',
+  units: [],
+  readings: [],
 
-  _read(key) {
-    try {
-      return JSON.parse(localStorage.getItem(key)) || [];
-    } catch (e) {
-      return [];
-    }
-  },
-  _write(key, value) {
-    localStorage.setItem(key, JSON.stringify(value));
-  },
+  getUnits() { return this.units; },
+  getReadings() { return this.readings; },
 
-  getUnits() { return this._read(this.UNITS_KEY); },
-  getReadings() { return this._read(this.READINGS_KEY); },
-
-  saveUnit(unit) {
-    const units = this.getUnits();
-    if (unit.id) {
-      const i = units.findIndex(u => u.id === unit.id);
-      if (i !== -1) units[i] = unit;
-    } else {
-      unit.id = makeId();
-      units.push(unit);
-    }
-    this._write(this.UNITS_KEY, units);
-    return unit;
-  },
-  deleteUnit(id) {
-    this._write(this.UNITS_KEY, this.getUnits().filter(u => u.id !== id));
-    // Ta även bort loggningar som hör till enheten.
-    this._write(this.READINGS_KEY, this.getReadings().filter(r => r.unitId !== id));
-  },
-
-  addReading(reading) {
-    reading.id = makeId();
-    const readings = this.getReadings();
-    readings.push(reading);
-    this._write(this.READINGS_KEY, readings);
-    return reading;
-  },
   readingsForUnit(unitId) {
-    return this.getReadings()
+    return this.readings
       .filter(r => r.unitId === unitId)
       .sort((a, b) => b.tidpunkt.localeCompare(a.tidpunkt));
   },
@@ -76,11 +59,52 @@ const Store = {
     const list = this.readingsForUnit(unitId);
     return list.length ? list[0] : null;
   },
-};
 
-function makeId() {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
-}
+  // Hämtar all delad data från molnet till cachen.
+  async load() {
+    const [unitsRes, readingsRes] = await Promise.all([
+      window.sb.from('units').select('*').order('created_at', { ascending: true }),
+      window.sb.from('readings').select('*').order('tidpunkt', { ascending: false }),
+    ]);
+    if (unitsRes.error) console.error('Kunde inte hämta enheter:', unitsRes.error);
+    if (readingsRes.error) console.error('Kunde inte hämta loggar:', readingsRes.error);
+    this.units = (unitsRes.data || []).map(mapUnitFromDb);
+    this.readings = (readingsRes.data || []).map(mapReadingFromDb);
+  },
+
+  async saveUnit(unit) {
+    if (unit.id) {
+      const { error } = await window.sb.from('units')
+        .update({ namn: unit.namn, typ: unit.typ, max_temp: unit.maxTemp })
+        .eq('id', unit.id);
+      if (error) throw error;
+    } else {
+      const { error } = await window.sb.from('units')
+        .insert({ namn: unit.namn, typ: unit.typ, max_temp: unit.maxTemp });
+      if (error) throw error;
+    }
+    await this.load();
+  },
+
+  async deleteUnit(id) {
+    // Loggar för enheten tas bort automatiskt (on delete cascade).
+    const { error } = await window.sb.from('units').delete().eq('id', id);
+    if (error) throw error;
+    await this.load();
+  },
+
+  async addReading(reading) {
+    const { error } = await window.sb.from('readings').insert({
+      unit_id: reading.unitId,
+      temp: reading.temp,
+      anteckning: reading.anteckning || '',
+      loggad_av: window.currentUserEmail || null,
+      tidpunkt: reading.tidpunkt || new Date().toISOString(),
+    });
+    if (error) throw error;
+    await this.load();
+  },
+};
 
 // ---------------------------------------------------------------------------
 // Hjälpfunktioner
@@ -239,7 +263,7 @@ document.querySelectorAll('#unit-type-seg .seg-btn').forEach(btn => {
   });
 });
 
-$('#unit-form').addEventListener('submit', (e) => {
+$('#unit-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const unit = {
     id: $('#unit-id').value || null,
@@ -248,20 +272,29 @@ $('#unit-form').addEventListener('submit', (e) => {
     maxTemp: parseFloat($('#unit-max').value),
   };
   if (!unit.namn || Number.isNaN(unit.maxTemp)) return;
-  Store.saveUnit(unit);
-  closeUnitModal();
-  renderUnits();
-  showToast('Enhet sparad');
+  try {
+    await Store.saveUnit(unit);
+    closeUnitModal();
+    renderUnits();
+    showToast('Enhet sparad');
+  } catch (err) {
+    console.error(err);
+    showToast('Kunde inte spara – kolla nätet');
+  }
 });
 
-$('#unit-delete').addEventListener('click', () => {
+$('#unit-delete').addEventListener('click', async () => {
   const id = $('#unit-id').value;
   if (!id) return;
-  if (confirm('Ta bort enheten och alla dess loggningar?')) {
-    Store.deleteUnit(id);
+  if (!confirm('Ta bort enheten och alla dess loggningar?')) return;
+  try {
+    await Store.deleteUnit(id);
     closeUnitModal();
     renderUnits();
     showToast('Enhet borttagen');
+  } catch (err) {
+    console.error(err);
+    showToast('Kunde inte ta bort – kolla nätet');
   }
 });
 
@@ -465,29 +498,38 @@ $('#unit-prev').addEventListener('click', () => stepUnit(-1));
 $('#unit-next').addEventListener('click', () => stepUnit(1));
 $('#log-unit').addEventListener('change', onLogUnitChange);
 
-$('#log-form').addEventListener('submit', (e) => {
+$('#log-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const unitId = $('#log-unit').value;
   const temp = parseFloat($('#log-temp').value);
   if (!unitId || Number.isNaN(temp)) return;
 
-  Store.addReading({
-    unitId,
-    temp,
-    anteckning: $('#log-note').value.trim(),
-    tidpunkt: new Date().toISOString(),
-  });
+  const saveBtn = $('#log-save');
+  saveBtn.disabled = true;
+  try {
+    await Store.addReading({
+      unitId,
+      temp,
+      anteckning: $('#log-note').value.trim(),
+      tidpunkt: new Date().toISOString(),
+    });
 
-  $('#log-temp').value = '';
-  $('#log-note').value = '';
-  $('#log-warning').classList.add('hidden');
+    $('#log-temp').value = '';
+    $('#log-note').value = '';
+    $('#log-warning').classList.add('hidden');
 
-  if (weekly.active) {
-    showToast('Sparat');
-    advanceWeekly(false);
-  } else {
-    showToast('Loggning sparad');
-    showView('units');
+    if (weekly.active) {
+      showToast('Sparat');
+      advanceWeekly(false);
+    } else {
+      showToast('Loggning sparad');
+      showView('units');
+    }
+  } catch (err) {
+    console.error(err);
+    showToast('Kunde inte spara – kolla nätet');
+  } finally {
+    saveBtn.disabled = false;
   }
 });
 
@@ -523,10 +565,11 @@ function renderHistoryList() {
   readings.forEach(r => {
     const bad = unit && isOutOfRange(r.temp, unit.maxTemp);
     const card = document.createElement('div');
+    const who = r.loggad_av ? r.loggad_av.split('@')[0] : '';
     card.className = 'reading-card' + (bad ? ' bad' : '');
     card.innerHTML = `
       <div class="row">
-        <span class="when">${formatDateTime(r.tidpunkt)}</span>
+        <span class="when">${formatDateTime(r.tidpunkt)}${who ? ' · ' + escapeHtml(who) : ''}</span>
         <span class="val ${bad ? 'bad' : ''}">${r.temp}°C</span>
       </div>
       ${r.anteckning ? `<div class="note">${escapeHtml(r.anteckning)}</div>` : ''}
@@ -550,7 +593,7 @@ $('#export-btn').addEventListener('click', () => {
     return;
   }
 
-  const rows = [['Datum/tid', 'Enhet', 'Typ', 'Temp (C)', 'Max (C)', 'Avvikelse', 'Anteckning']];
+  const rows = [['Datum/tid', 'Enhet', 'Typ', 'Temp (C)', 'Max (C)', 'Avvikelse', 'Loggad av', 'Anteckning']];
   readings.forEach(r => {
     rows.push([
       formatDateTime(r.tidpunkt),
@@ -559,6 +602,7 @@ $('#export-btn').addEventListener('click', () => {
       String(r.temp).replace('.', ','),
       String(unit.maxTemp).replace('.', ','),
       isOutOfRange(r.temp, unit.maxTemp) ? 'JA' : '',
+      r.loggad_av || '',
       r.anteckning || '',
     ]);
   });
@@ -582,6 +626,38 @@ $('#export-btn').addEventListener('click', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Start
+// Realtid: uppdatera cachen och vyn när någon annan ändrar data.
 // ---------------------------------------------------------------------------
-showView('units');
+let realtimeTimer = null;
+function onRemoteChange() {
+  // Liten fördröjning ifall flera ändringar kommer tätt.
+  clearTimeout(realtimeTimer);
+  realtimeTimer = setTimeout(async () => {
+    await Store.load();
+    // Rita om aktuell vy. Logg-vyn lämnas ifred så pågående inmatning inte
+    // skrivs över; Enheter och Historik är säkra att rita om.
+    const active = document.querySelector('.nav-btn.active');
+    const view = active ? active.dataset.view : 'units';
+    if (view === 'units') renderUnits();
+    else if (view === 'history') renderHistoryList();
+  }, 150);
+}
+
+function subscribeRealtime() {
+  window.sb.channel('db-changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'units' }, onRemoteChange)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'readings' }, onRemoteChange)
+    .subscribe();
+}
+
+// ---------------------------------------------------------------------------
+// Start: körs av auth.js när inloggning OCH åtkomst är bekräftad.
+// ---------------------------------------------------------------------------
+let appStarted = false;
+window.onAppReady = async function () {
+  if (appStarted) return;
+  appStarted = true;
+  await Store.load();
+  showView('units');
+  subscribeRealtime();
+};
