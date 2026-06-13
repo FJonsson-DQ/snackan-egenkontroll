@@ -1,11 +1,37 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="96" fill="#243f2f"/>
-  <!-- Dubbelram som på skylten -->
-  <rect x="34" y="34" width="444" height="444" rx="56" fill="none" stroke="#e9e1c9" stroke-width="7"/>
-  <rect x="50" y="50" width="412" height="412" rx="44" fill="none" stroke="#e9e1c9" stroke-width="2.5"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" font-family="Georgia, 'Times New Roman', serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2c4a39"/>
+      <stop offset="1" stop-color="#21382b"/>
+    </linearGradient>
+    <!-- Båge för "Konditori" -->
+    <path id="arc" d="M120 184 Q256 120 392 184" fill="none"/>
+  </defs>
+
+  <!-- Botten -->
+  <rect width="512" height="512" rx="104" fill="url(#bg)"/>
+  <!-- Tunn vintage-ram -->
+  <rect x="34" y="34" width="444" height="444" rx="74" fill="none" stroke="#e6c486" stroke-width="3" opacity="0.85"/>
+
   <!-- Text -->
-  <g fill="#ece5cf" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif">
-    <text x="256" y="226" font-size="70" font-style="italic">Konditori</text>
-    <text x="256" y="338" font-size="104" font-weight="700" letter-spacing="3" textLength="340" lengthAdjust="spacingAndGlyphs">SNÄCKAN</text>
+  <g fill="#e9c886">
+    <text font-size="56" font-style="italic" text-anchor="middle">
+      <textPath href="#arc" startOffset="50%">Konditori</textPath>
+    </text>
+    <text x="256" y="296" font-size="118" font-weight="700" letter-spacing="4"
+          text-anchor="middle" textLength="360" lengthAdjust="spacingAndGlyphs">SNÄCKAN</text>
+  </g>
+
+  <!-- Kaffekopp (nedflyttad) -->
+  <g stroke="#e9c886" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
+    <!-- ånga (mindre) -->
+    <path fill="none" d="M247 356 q-6 -8 0 -16 q6 -8 0 -16"/>
+    <path fill="none" d="M265 356 q-6 -8 0 -16 q6 -8 0 -16"/>
+    <!-- kopp -->
+    <path fill="#e9c886" stroke="none" d="M214 374 h84 l-8 40 a34 14 0 0 1 -68 0 z"/>
+    <!-- handtag -->
+    <path fill="none" d="M300 382 a20 20 0 0 1 0 34"/>
+    <!-- fat, tydligt under koppen -->
+    <path fill="none" d="M200 440 h112"/>
   </g>
 </svg>
