@@ -1,6 +1,6 @@
 {
-  "name": "Snäckan – Egenkontroll",
-  "short_name": "Egenkontroll",
+  "name": "Snäckan",
+  "short_name": "Snäckan",
   "description": "Logga temperaturer för kyl och frys (egenkontroll/HACCP).",
   "start_url": "./index.html",
   "display": "standalone",
