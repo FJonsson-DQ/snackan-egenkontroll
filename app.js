@@ -587,8 +587,19 @@ function onLogUnitChange() {
   const unit = Store.getUnits().find(u => u.id === $('#log-unit').value);
   const latest = unit ? Store.latestReading(unit.id) : null;
   $('#log-temp').value = latest ? latest.temp : '';
+  // ±-knappen behövs bara för frys (negativa värden, som mobilens sifferknappsats saknar).
+  $('#temp-sign').classList.toggle('hidden', !unit || unit.typ !== 'frys');
   renderTempChips();
   updateLogWarning();
+}
+
+// Växlar tecken på inskrivet värde (skriv siffran, tryck ± → negativt).
+function toggleTempSign() {
+  const input = $('#log-temp');
+  const n = parseFloat(input.value);
+  if (Number.isNaN(n)) { input.focus(); return; }
+  input.value = String(-n);
+  onTempChanged();
 }
 
 function updateLogWarning() {
@@ -618,6 +629,7 @@ function stepTemp(delta) {
   onTempChanged();
 }
 
+$('#temp-sign').addEventListener('click', toggleTempSign);
 $('#temp-minus').addEventListener('click', () => stepTemp(-0.5));
 $('#temp-plus').addEventListener('click', () => stepTemp(0.5));
 $('#log-temp').addEventListener('input', onTempChanged);
