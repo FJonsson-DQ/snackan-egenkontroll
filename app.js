@@ -897,33 +897,67 @@ function formatNum(n) {
 }
 function formatAmount(item) { return formatNum(item.antal); }
 
+// Fällbara kategorier: vilka som är ihopfällda sparas (överlever omladdning).
+let collapsedGroups = null;
+function getCollapsed() {
+  if (!collapsedGroups) {
+    try { collapsedGroups = new Set(JSON.parse(localStorage.getItem('bowsapp.collapsed') || '[]')); }
+    catch (e) { collapsedGroups = new Set(); }
+  }
+  return collapsedGroups;
+}
+function toggleCollapsed(key) {
+  const c = getCollapsed();
+  if (c.has(key)) c.delete(key); else c.add(key);
+  localStorage.setItem('bowsapp.collapsed', JSON.stringify([...c]));
+  renderInventory();
+}
+
 function renderInventory() {
   const wrap = $('#inventory-list');
   const items = Store.getInventory();
   wrap.innerHTML = '';
   $('#inventory-empty').classList.toggle('hidden', items.length > 0);
   const subById = Object.fromEntries(Store.getSubcategories().map(s => [s.id, s]));
+  const collapsed = getCollapsed();
 
   HUVUD.forEach(h => {
     const inH = items.filter(i => i.huvud === h.key);
     if (inH.length === 0) return;
     const group = document.createElement('div');
     group.className = 'inv-group';
-    group.innerHTML = `<div class="inv-group-title">${h.label}</div>`;
 
-    // Gruppera per underkategori-namn.
-    const bySub = {};
-    inH.forEach(i => {
-      const namn = (subById[i.underkategoriId] && subById[i.underkategoriId].namn) || 'Övrigt';
-      (bySub[namn] = bySub[namn] || []).push(i);
-    });
-    Object.keys(bySub).sort((a, b) => a.localeCompare(b)).forEach(subNamn => {
-      const sub = document.createElement('div');
-      sub.className = 'inv-subgroup';
-      sub.innerHTML = `<div class="inv-sub-title">${escapeHtml(subNamn)}</div>`;
-      bySub[subNamn].forEach(item => sub.appendChild(renderInventoryItem(item)));
-      group.appendChild(sub);
-    });
+    const hKey = 'h:' + h.key;
+    const hCollapsed = collapsed.has(hKey);
+    const title = document.createElement('div');
+    title.className = 'inv-group-title' + (hCollapsed ? ' collapsed' : '');
+    title.innerHTML = `<span class="inv-chevron">▸</span><span>${h.label}</span><span class="inv-count">${inH.length}</span>`;
+    title.addEventListener('click', () => toggleCollapsed(hKey));
+    group.appendChild(title);
+
+    if (!hCollapsed) {
+      // Gruppera per underkategori-namn.
+      const bySub = {};
+      inH.forEach(i => {
+        const namn = (subById[i.underkategoriId] && subById[i.underkategoriId].namn) || 'Övrigt';
+        (bySub[namn] = bySub[namn] || []).push(i);
+      });
+      Object.keys(bySub).sort((a, b) => a.localeCompare(b)).forEach(subNamn => {
+        const sub = document.createElement('div');
+        sub.className = 'inv-subgroup';
+        const sKey = 's:' + h.key + ':' + subNamn;
+        const sCollapsed = collapsed.has(sKey);
+        const subTitle = document.createElement('div');
+        subTitle.className = 'inv-sub-title' + (sCollapsed ? ' collapsed' : '');
+        subTitle.innerHTML = `<span class="inv-chevron">▸</span><span>${escapeHtml(subNamn)}</span><span class="inv-count">${bySub[subNamn].length}</span>`;
+        subTitle.addEventListener('click', () => toggleCollapsed(sKey));
+        sub.appendChild(subTitle);
+        if (!sCollapsed) {
+          bySub[subNamn].forEach(item => sub.appendChild(renderInventoryItem(item)));
+        }
+        group.appendChild(sub);
+      });
+    }
     wrap.appendChild(group);
   });
 }
