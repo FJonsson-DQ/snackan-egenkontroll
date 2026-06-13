@@ -511,8 +511,13 @@ input[type="number"] {
 }
 .snap-row small { display: block; color: var(--muted); font-size: 0.75rem; }
 .snap-amt { font-weight: 700; white-space: nowrap; }
-#snapshot-detail { max-height: 60vh; overflow-y: auto; }
-#snapshots-list { max-height: 60vh; overflow-y: auto; }
+#snapshot-detail, #snapshots-list {
+  max-height: 60vh;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+#snapshot-detail::-webkit-scrollbar, #snapshots-list::-webkit-scrollbar { display: none; }
 
 .warning {
   background: var(--red-bg);
@@ -596,7 +601,10 @@ input[type="number"] {
   padding: 20px 16px calc(20px + env(safe-area-inset-bottom));
   max-height: 90vh;
   overflow-y: auto;
+  scrollbar-width: none;        /* Firefox */
+  -ms-overflow-style: none;     /* äldre Edge */
 }
+.modal-box::-webkit-scrollbar { display: none; }  /* Chrome/Safari */
 .modal-box h2 {
   margin-top: 0;
   font-family: var(--serif);
