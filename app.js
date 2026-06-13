@@ -953,7 +953,9 @@ function renderInventory() {
         subTitle.addEventListener('click', () => toggleCollapsed(sKey));
         sub.appendChild(subTitle);
         if (!sCollapsed) {
-          bySub[subNamn].forEach(item => sub.appendChild(renderInventoryItem(item)));
+          bySub[subNamn]
+            .sort((a, b) => a.namn.localeCompare(b.namn, 'sv'))
+            .forEach(item => sub.appendChild(renderInventoryItem(item)));
         }
         group.appendChild(sub);
       });
