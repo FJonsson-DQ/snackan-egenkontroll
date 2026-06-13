@@ -179,6 +179,18 @@ const Store = {
     return data ? data.id : null;
   },
 
+  async renameSubcategory(id, namn) {
+    const { error } = await window.sb.from('subcategories').update({ namn }).eq('id', id);
+    if (error) throw error;
+    await this.load();
+  },
+
+  async deleteSubcategory(id) {
+    const { error } = await window.sb.from('subcategories').delete().eq('id', id);
+    if (error) throw error;
+    await this.load();
+  },
+
   // --- Inventering (ögonblicksbild + nollställ) ---
   async saveSnapshotAndReset() {
     const subById = Object.fromEntries(this.subcategories.map(s => [s.id, s.namn]));
@@ -1008,6 +1020,16 @@ function fillSubcatSelect(huvud, selectedId) {
   });
   if (selectedId && subs.some(s => s.id === selectedId)) select.value = selectedId;
   else if (subs.length) select.selectedIndex = 0;
+  updateSubActions();
+}
+
+// Visar Byt namn/Ta bort om vald underkategori inte är skyddade "Övrigt".
+function updateSubActions() {
+  const id = $('#item-underkategori').value;
+  const sub = Store.getSubcategories().find(s => s.id === id);
+  const editable = !!sub && sub.namn !== 'Övrigt';
+  $('#item-sub-actions').classList.toggle('hidden', !editable);
+  $('#item-sub-rename-row').classList.add('hidden');
 }
 
 function openItemModal(itemId) {
@@ -1078,6 +1100,55 @@ $('#item-sub-new-save').addEventListener('click', async () => {
   } catch (err) {
     console.error(err);
     showToast('Kunde inte skapa underkategori');
+  }
+});
+
+// Visa/dölj knapparna när man byter underkategori i listan.
+$('#item-underkategori').addEventListener('change', updateSubActions);
+
+// Byt namn på vald underkategori (inline-fält).
+$('#item-sub-rename').addEventListener('click', () => {
+  const sub = Store.getSubcategories().find(s => s.id === $('#item-underkategori').value);
+  if (!sub) return;
+  $('#item-sub-rename-name').value = sub.namn;
+  $('#item-sub-rename-row').classList.remove('hidden');
+  $('#item-sub-rename-name').focus();
+});
+$('#item-sub-rename-cancel').addEventListener('click', () => {
+  $('#item-sub-rename-row').classList.add('hidden');
+});
+$('#item-sub-rename-save').addEventListener('click', async () => {
+  const id = $('#item-underkategori').value;
+  const huvud = $('#item-huvud').value;
+  const namn = $('#item-sub-rename-name').value.trim();
+  if (!namn) { $('#item-sub-rename-name').focus(); return; }
+  try {
+    await Store.renameSubcategory(id, namn);
+    fillSubcatSelect(huvud, id);
+    showToast('Namn ändrat');
+  } catch (err) {
+    console.error(err);
+    showToast('Kunde inte byta namn');
+  }
+});
+
+// Ta bort vald underkategori (blockeras om den har varor; "Övrigt" skyddad).
+$('#item-sub-delete').addEventListener('click', async () => {
+  const id = $('#item-underkategori').value;
+  const huvud = $('#item-huvud').value;
+  const sub = Store.getSubcategories().find(s => s.id === id);
+  if (!sub || sub.namn === 'Övrigt') return;
+  if (Store.getInventory().some(i => i.underkategoriId === id)) {
+    showToast('Flytta varorna först');
+    return;
+  }
+  try {
+    await Store.deleteSubcategory(id);
+    fillSubcatSelect(huvud);
+    showToast('Underkategori borttagen');
+  } catch (err) {
+    console.error(err);
+    showToast('Kunde inte ta bort');
   }
 });
 
