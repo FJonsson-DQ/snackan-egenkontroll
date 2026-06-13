@@ -278,6 +278,17 @@ main {
   color: var(--text);
   min-height: 48px;
 }
+
+/* Dölj webbläsarens inbyggda upp/ner-pilar på sifferfält (vi har egna +/-) */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
 .form textarea { min-height: 60px; resize: vertical; }
 .hint { color: var(--muted); font-size: 0.78rem; }
 
