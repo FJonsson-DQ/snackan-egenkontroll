@@ -539,6 +539,39 @@ input[type="number"] {
 }
 .snap-row small { display: block; color: var(--muted); font-size: 0.75rem; }
 .snap-amt { font-weight: 700; white-space: nowrap; }
+.snap-head {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin: 12px 0 4px 2px;
+}
+.snap-namn { flex: 1; min-width: 0; }
+.snap-edit { display: flex; align-items: center; gap: 6px; flex: none; }
+.snap-amt-input {
+  width: 62px;
+  text-align: center;
+  font-weight: 700;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--input-bg);
+  color: var(--text);
+}
+.snap-unit { font-size: 0.78rem; color: var(--muted); min-width: 36px; }
+.snap-remove {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border: 1px solid var(--border);
+  background: var(--input-bg);
+  border-radius: 8px;
+  color: var(--red);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
 #snapshot-detail, #snapshots-list {
   max-height: 60vh;
   overflow-y: auto;

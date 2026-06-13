@@ -195,14 +195,16 @@ const Store = {
   // Sparar en ögonblicksbild av lagret (utan att röra antalen).
   async saveSnapshot() {
     const subById = Object.fromEntries(this.subcategories.map(s => [s.id, s.namn]));
-    const data = this.inventory.map(i => ({
-      namn: i.namn,
-      huvud: i.huvud,
-      underkategori: subById[i.underkategoriId] || 'Övrigt',
-      artikelnummer: i.artikelnummer || '',
-      enhet: i.enhet,
-      antal: i.antal,
-    }));
+    const data = this.inventory
+      .filter(i => i.antal > 0) // varor med 0 tas inte med i sammanfattningen
+      .map(i => ({
+        namn: i.namn,
+        huvud: i.huvud,
+        underkategori: subById[i.underkategoriId] || 'Övrigt',
+        artikelnummer: i.artikelnummer || '',
+        enhet: i.enhet,
+        antal: i.antal,
+      }));
     const { error } = await window.sb.from('inventory_snapshots')
       .insert({ skapad_av: window.currentUserEmail || null, data });
     if (error) throw error;
@@ -224,6 +226,16 @@ const Store = {
       .select('*').order('skapad_at', { ascending: false });
     if (error) { console.error('Kunde inte hämta inventeringar:', error); return []; }
     return data || [];
+  },
+
+  async updateSnapshot(id, data) {
+    const { error } = await window.sb.from('inventory_snapshots').update({ data }).eq('id', id);
+    if (error) throw error;
+  },
+
+  async deleteSnapshot(id) {
+    const { error } = await window.sb.from('inventory_snapshots').delete().eq('id', id);
+    if (error) throw error;
   },
 };
 
@@ -1273,14 +1285,33 @@ resetBtn.addEventListener('click', async () => {
 });
 
 let currentSnapshot = null;
+let snapEdit = null;            // redigerbar arbetskopia av snapshotens data
+let snapDeleteArmed = false;
+let snapDeleteTimer = null;
 
-async function openSnapshots() {
+function disarmSnapDelete() {
+  snapDeleteArmed = false;
+  clearTimeout(snapDeleteTimer);
+  $('#snapshot-delete').textContent = 'Ta bort hela inventeringen';
+}
+
+// Visar listan över inventeringar (döljer detaljvy + dess knappar).
+function snapshotsShowList() {
   $('#snapshot-detail').classList.add('hidden');
   $('#snapshot-detail').innerHTML = '';
-  $('#snapshot-export').classList.add('hidden');
   $('#snapshots-list').classList.remove('hidden');
   $('#snapshots-title').textContent = 'Tidigare inventeringar';
+  $('#snapshot-export').classList.add('hidden');
+  $('#snapshot-save').classList.add('hidden');
+  $('#snapshot-delete').classList.add('hidden');
+  disarmSnapDelete();
+  currentSnapshot = null;
+  snapEdit = null;
+}
+
+async function openSnapshots() {
   $('#snapshots-modal').classList.remove('hidden');
+  snapshotsShowList();
   renderSnapshotList(await Store.getSnapshots());
 }
 
@@ -1303,40 +1334,100 @@ function renderSnapshotList(snaps) {
 
 function showSnapshotDetail(s) {
   currentSnapshot = s;
+  snapEdit = JSON.parse(JSON.stringify(Array.isArray(s.data) ? s.data : []));
   $('#snapshots-list').classList.add('hidden');
   $('#snapshots-empty').classList.add('hidden');
   $('#snapshots-title').textContent = formatDateTime(s.skapad_at);
-  const data = Array.isArray(s.data) ? s.data : [];
-  let html = '';
+  $('#snapshot-export').classList.remove('hidden');
+  $('#snapshot-save').classList.remove('hidden');
+  $('#snapshot-delete').classList.remove('hidden');
+  renderSnapshotDetail();
+}
+
+// Bygger den redigerbara detaljvyn från arbetskopian snapEdit.
+function renderSnapshotDetail() {
+  const detail = $('#snapshot-detail');
+  detail.innerHTML = '';
+  detail.classList.remove('hidden');
+  if (!snapEdit.length) {
+    detail.innerHTML = '<p class="empty-msg">Inga varor i den här inventeringen.</p>';
+    return;
+  }
   ['forrad', 'kyl', 'frys'].forEach(h => {
-    const inH = data.filter(d => d.huvud === h);
-    if (!inH.length) return;
-    html += `<div class="inv-group-title">${HUVUD_LABEL[h] || h}</div>`;
-    inH.forEach(d => {
-      const art = d.artikelnummer ? ` · #${escapeHtml(d.artikelnummer)}` : '';
-      html += `<div class="snap-row">
-        <span>${escapeHtml(d.namn)}<small>${escapeHtml(d.underkategori || '')}${art}</small></span>
-        <span class="snap-amt">${formatNum(d.antal)} ${escapeHtml(d.enhet)}</span></div>`;
+    const rows = snapEdit.map((d, i) => ({ d, i })).filter(x => x.d.huvud === h);
+    if (!rows.length) return;
+    const head = document.createElement('div');
+    head.className = 'snap-head';
+    head.textContent = HUVUD_LABEL[h] || h;
+    detail.appendChild(head);
+    rows.forEach(({ d, i }) => {
+      const art = d.artikelnummer ? ' · #' + escapeHtml(d.artikelnummer) : '';
+      const row = document.createElement('div');
+      row.className = 'snap-row';
+      row.innerHTML = `
+        <span class="snap-namn">${escapeHtml(d.namn)}<small>${escapeHtml(d.underkategori || '')}${art}</small></span>
+        <span class="snap-edit">
+          <input type="number" step="0.1" inputmode="decimal" class="snap-amt-input" value="${d.antal}">
+          <span class="snap-unit">${escapeHtml(d.enhet)}</span>
+          <button type="button" class="snap-remove" aria-label="Ta bort rad">×</button>
+        </span>`;
+      row.querySelector('.snap-amt-input').addEventListener('input', (e) => {
+        const v = parseFloat(e.target.value);
+        snapEdit[i].antal = Number.isNaN(v) ? 0 : Math.max(0, v);
+      });
+      row.querySelector('.snap-remove').addEventListener('click', () => {
+        snapEdit.splice(i, 1);
+        renderSnapshotDetail();
+      });
+      detail.appendChild(row);
     });
   });
-  const detail = $('#snapshot-detail');
-  detail.innerHTML = html || '<p class="empty-msg">Tomt.</p>';
-  detail.classList.remove('hidden');
-  $('#snapshot-export').classList.remove('hidden');
 }
 
 $('#snapshots-history-btn').addEventListener('click', openSnapshots);
 
-$('#snapshots-close').addEventListener('click', () => {
+$('#snapshots-close').addEventListener('click', async () => {
   // Från detaljvy → tillbaka till listan; annars stäng modalen.
   if (!$('#snapshot-detail').classList.contains('hidden')) {
-    $('#snapshot-detail').classList.add('hidden');
-    $('#snapshot-export').classList.add('hidden');
-    $('#snapshots-list').classList.remove('hidden');
-    $('#snapshots-title').textContent = 'Tidigare inventeringar';
-    currentSnapshot = null;
+    snapshotsShowList();
+    renderSnapshotList(await Store.getSnapshots());
   } else {
     $('#snapshots-modal').classList.add('hidden');
+  }
+});
+
+$('#snapshot-save').addEventListener('click', async () => {
+  if (!currentSnapshot) return;
+  const cleaned = snapEdit.filter(d => Number(d.antal) > 0); // 0 tas bort
+  try {
+    await Store.updateSnapshot(currentSnapshot.id, cleaned);
+    currentSnapshot.data = cleaned;
+    snapEdit = JSON.parse(JSON.stringify(cleaned));
+    renderSnapshotDetail();
+    showToast('Inventering uppdaterad');
+  } catch (err) {
+    console.error(err);
+    showToast('Kunde inte spara – kolla nätet');
+  }
+});
+
+$('#snapshot-delete').addEventListener('click', async () => {
+  if (!currentSnapshot) return;
+  if (!snapDeleteArmed) {
+    snapDeleteArmed = true;
+    $('#snapshot-delete').textContent = 'Bekräfta borttagning?';
+    snapDeleteTimer = setTimeout(disarmSnapDelete, 4000);
+    return;
+  }
+  disarmSnapDelete();
+  try {
+    await Store.deleteSnapshot(currentSnapshot.id);
+    showToast('Inventering borttagen');
+    snapshotsShowList();
+    renderSnapshotList(await Store.getSnapshots());
+  } catch (err) {
+    console.error(err);
+    showToast('Kunde inte ta bort – kolla nätet');
   }
 });
 
