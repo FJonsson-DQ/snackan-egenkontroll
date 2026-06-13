@@ -422,12 +422,12 @@ input[type="number"] {
 /* Lager */
 .inv-group { margin-bottom: 18px; }
 .inv-group-title {
-  font-size: 1rem;
+  font-size: 1.3rem;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   color: var(--text);
   font-weight: 700;
-  margin: 4px 0 10px 2px;
+  margin: 6px 0 12px 2px;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -505,10 +505,10 @@ input[type="number"] {
 /* Underkategori-rubriker i lagerlistan */
 .inv-subgroup { margin-bottom: 10px; }
 .inv-sub-title {
-  font-size: 0.95rem;
+  font-size: 1.1rem;
   font-weight: 600;
   color: var(--green-deep);
-  margin: 8px 0 8px 2px;
+  margin: 10px 0 8px 2px;
   display: flex;
   align-items: center;
   gap: 6px;
