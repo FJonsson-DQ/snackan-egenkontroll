@@ -1036,6 +1036,7 @@ function openItemModal(itemId) {
     $('#item-antal').value = '0';
     deleteBtn.classList.add('hidden');
   }
+  hideNewSubRow();
   modal.classList.remove('hidden');
 }
 function closeItemModal() { $('#item-modal').classList.add('hidden'); }
@@ -1047,19 +1048,33 @@ document.querySelectorAll('#item-huvud-seg .seg-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     setSeg('#item-huvud-seg', '#item-huvud', btn.dataset.huvud, 'huvud');
     fillSubcatSelect(btn.dataset.huvud);
+    hideNewSubRow();
   });
 });
 document.querySelectorAll('#item-enhet-seg .seg-btn').forEach(btn => {
   btn.addEventListener('click', () => setSeg('#item-enhet-seg', '#item-enhet', btn.dataset.enhet, 'enhet'));
 });
 
-$('#item-sub-new').addEventListener('click', async () => {
+function hideNewSubRow() {
+  $('#item-sub-new-row').classList.add('hidden');
+  $('#item-sub-new-name').value = '';
+}
+
+$('#item-sub-new').addEventListener('click', () => {
+  $('#item-sub-new-row').classList.remove('hidden');
+  $('#item-sub-new-name').focus();
+});
+$('#item-sub-new-cancel').addEventListener('click', hideNewSubRow);
+
+$('#item-sub-new-save').addEventListener('click', async () => {
   const huvud = $('#item-huvud').value;
-  const namn = (prompt('Namn på ny underkategori:') || '').trim();
-  if (!namn) return;
+  const namn = $('#item-sub-new-name').value.trim();
+  if (!namn) { $('#item-sub-new-name').focus(); return; }
   try {
     const id = await Store.addSubcategory(huvud, namn);
     fillSubcatSelect(huvud, id);
+    hideNewSubRow();
+    showToast('Underkategori skapad');
   } catch (err) {
     console.error(err);
     showToast('Kunde inte skapa underkategori');
