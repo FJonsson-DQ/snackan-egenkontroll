@@ -139,12 +139,30 @@
           Lägg till vara
         </button>
       </div>
+      <div class="lager-actions">
+        <button class="btn" id="snapshot-btn">Sammanfatta &amp; nollställ</button>
+        <button class="btn" id="snapshots-history-btn">Tidigare inventeringar</button>
+      </div>
       <div id="inventory-list"></div>
       <p id="inventory-empty" class="empty-msg hidden">
         Inga varor än.<br>Tryck på "Lägg till vara" för att börja fylla lagret.
       </p>
     </section>
   </main>
+
+  <!-- Modal: inventeringshistorik -->
+  <div id="snapshots-modal" class="modal hidden">
+    <div class="modal-box">
+      <h2 id="snapshots-title">Tidigare inventeringar</h2>
+      <div id="snapshots-list" class="card-list"></div>
+      <p id="snapshots-empty" class="empty-msg hidden">Inga sparade inventeringar än.</p>
+      <div id="snapshot-detail" class="hidden"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn" id="snapshots-close">Stäng</button>
+        <button type="button" class="btn hidden" id="snapshot-export">Exportera (CSV)</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Nedre navigering -->
   <nav class="bottom-nav">
@@ -209,13 +227,24 @@
           <input id="item-name" type="text" placeholder="T.ex. Smör" required>
         </label>
         <label>
-          Kategori
-          <div class="seg" id="item-kategori-seg">
-            <button type="button" class="seg-btn active" data-kategori="varmt">Varmt</button>
-            <button type="button" class="seg-btn" data-kategori="kyl">Kyl</button>
-            <button type="button" class="seg-btn" data-kategori="frys">Frys</button>
+          Huvudkategori
+          <div class="seg" id="item-huvud-seg">
+            <button type="button" class="seg-btn active" data-huvud="forrad">Förråd</button>
+            <button type="button" class="seg-btn" data-huvud="kyl">Kyl</button>
+            <button type="button" class="seg-btn" data-huvud="frys">Frys</button>
           </div>
-          <input type="hidden" id="item-kategori" value="varmt">
+          <input type="hidden" id="item-huvud" value="forrad">
+        </label>
+        <label>
+          Underkategori
+          <div class="sub-row">
+            <select id="item-underkategori"></select>
+            <button type="button" class="btn" id="item-sub-new" title="Ny underkategori">+ Ny</button>
+          </div>
+        </label>
+        <label>
+          Artikelnummer (frivilligt)
+          <input id="item-artikelnummer" type="text" inputmode="text" placeholder="T.ex. 123456">
         </label>
         <label>
           Enhet

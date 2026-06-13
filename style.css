@@ -480,6 +480,39 @@ input[type="number"] {
   background: var(--input-bg);
   color: var(--text);
 }
+.inv-art { display: block; font-weight: 400; font-size: 0.72rem; color: var(--muted); }
+
+/* Underkategori-rubriker i lagerlistan */
+.inv-subgroup { margin-bottom: 10px; }
+.inv-sub-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--green-deep);
+  margin: 6px 0 6px 2px;
+}
+
+/* Underkategori-väljare i varu-rutan */
+.sub-row { display: flex; gap: 8px; }
+.sub-row select { flex: 1; min-width: 0; }
+.sub-row .btn { flex: none; }
+
+/* Lager-åtgärder (inventering/historik) */
+.lager-actions { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+.lager-actions .btn { flex: 1; }
+.snap-card { cursor: pointer; }
+
+/* Snapshot-detalj */
+.snap-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 2px;
+  border-bottom: 1px solid var(--border);
+}
+.snap-row small { display: block; color: var(--muted); font-size: 0.75rem; }
+.snap-amt { font-weight: 700; white-space: nowrap; }
+#snapshot-detail { max-height: 60vh; overflow-y: auto; }
+#snapshots-list { max-height: 60vh; overflow-y: auto; }
 
 .warning {
   background: var(--red-bg);

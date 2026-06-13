@@ -46,21 +46,29 @@ function mapItemFromDb(i) {
   return {
     id: i.id,
     namn: i.namn,
-    kategori: i.kategori,
+    huvud: i.huvud,
+    underkategoriId: i.underkategori_id || null,
+    artikelnummer: i.artikelnummer || '',
     enhet: i.enhet,
     antal: Number(i.antal),
     updated_by: i.updated_by || '',
   };
+}
+function mapSubcatFromDb(s) {
+  return { id: s.id, huvud: s.huvud, namn: s.namn };
 }
 
 const Store = {
   units: [],
   readings: [],
   inventory: [],
+  subcategories: [],
 
   getUnits() { return this.units; },
   getReadings() { return this.readings; },
   getInventory() { return this.inventory; },
+  getSubcategories() { return this.subcategories; },
+  subcategoriesFor(huvud) { return this.subcategories.filter(s => s.huvud === huvud); },
 
   readingsForUnit(unitId) {
     return this.readings
@@ -74,17 +82,20 @@ const Store = {
 
   // Hämtar all delad data från molnet till cachen.
   async load() {
-    const [unitsRes, readingsRes, invRes] = await Promise.all([
+    const [unitsRes, readingsRes, invRes, subRes] = await Promise.all([
       window.sb.from('units').select('*').order('created_at', { ascending: true }),
       window.sb.from('readings').select('*').order('tidpunkt', { ascending: false }),
       window.sb.from('inventory').select('*').order('namn', { ascending: true }),
+      window.sb.from('subcategories').select('*').order('namn', { ascending: true }),
     ]);
     if (unitsRes.error) console.error('Kunde inte hämta enheter:', unitsRes.error);
     if (readingsRes.error) console.error('Kunde inte hämta loggar:', readingsRes.error);
     if (invRes.error) console.error('Kunde inte hämta lager:', invRes.error);
+    if (subRes.error) console.error('Kunde inte hämta underkategorier:', subRes.error);
     this.units = (unitsRes.data || []).map(mapUnitFromDb);
     this.readings = (readingsRes.data || []).map(mapReadingFromDb);
     this.inventory = (invRes.data || []).map(mapItemFromDb);
+    this.subcategories = (subRes.data || []).map(mapSubcatFromDb);
   },
 
   async saveUnit(unit) {
@@ -124,7 +135,9 @@ const Store = {
   async saveItem(item) {
     const fields = {
       namn: item.namn,
-      kategori: item.kategori,
+      huvud: item.huvud,
+      underkategori_id: item.underkategoriId,
+      artikelnummer: item.artikelnummer || null,
       enhet: item.enhet,
       antal: item.antal,
       updated_by: window.currentUserEmail || null,
@@ -155,6 +168,47 @@ const Store = {
       .update({ antal: value, updated_by: window.currentUserEmail || null, updated_at: new Date().toISOString() })
       .eq('id', id);
     if (error) throw error;
+  },
+
+  // --- Underkategorier ---
+  async addSubcategory(huvud, namn) {
+    const { data, error } = await window.sb.from('subcategories')
+      .insert({ huvud, namn }).select().single();
+    if (error) throw error;
+    await this.load();
+    return data ? data.id : null;
+  },
+
+  // --- Inventering (ögonblicksbild + nollställ) ---
+  async saveSnapshotAndReset() {
+    const subById = Object.fromEntries(this.subcategories.map(s => [s.id, s.namn]));
+    const data = this.inventory.map(i => ({
+      namn: i.namn,
+      huvud: i.huvud,
+      underkategori: subById[i.underkategoriId] || 'Övrigt',
+      artikelnummer: i.artikelnummer || '',
+      enhet: i.enhet,
+      antal: i.antal,
+    }));
+    const { error: insErr } = await window.sb.from('inventory_snapshots')
+      .insert({ skapad_av: window.currentUserEmail || null, data });
+    if (insErr) throw insErr;
+    // Nollställ alla antal
+    const ids = this.inventory.map(i => i.id);
+    if (ids.length) {
+      const { error: updErr } = await window.sb.from('inventory')
+        .update({ antal: 0, updated_by: window.currentUserEmail || null, updated_at: new Date().toISOString() })
+        .in('id', ids);
+      if (updErr) throw updErr;
+    }
+    await this.load();
+  },
+
+  async getSnapshots() {
+    const { data, error } = await window.sb.from('inventory_snapshots')
+      .select('*').order('skapad_at', { ascending: false });
+    if (error) { console.error('Kunde inte hämta inventeringar:', error); return []; }
+    return data || [];
   },
 };
 
@@ -819,30 +873,45 @@ $('#export-all-btn').addEventListener('click', () => {
 // ---------------------------------------------------------------------------
 // Vy: Lager (inventory)
 // ---------------------------------------------------------------------------
-const KATEGORIER = [
-  { key: 'varmt', label: 'Varmt' },
+const HUVUD = [
+  { key: 'forrad', label: 'Förråd' },
   { key: 'kyl', label: 'Kyl' },
   { key: 'frys', label: 'Frys' },
 ];
+const HUVUD_LABEL = { forrad: 'Förråd', kyl: 'Kyl', frys: 'Frys' };
 
-function formatAmount(item) {
-  const n = item.antal;
+function formatNum(n) {
   return Number.isInteger(n) ? String(n) : String(n).replace('.', ',');
 }
+function formatAmount(item) { return formatNum(item.antal); }
 
 function renderInventory() {
   const wrap = $('#inventory-list');
   const items = Store.getInventory();
   wrap.innerHTML = '';
   $('#inventory-empty').classList.toggle('hidden', items.length > 0);
+  const subById = Object.fromEntries(Store.getSubcategories().map(s => [s.id, s]));
 
-  KATEGORIER.forEach(cat => {
-    const inCat = items.filter(i => i.kategori === cat.key);
-    if (inCat.length === 0) return;
+  HUVUD.forEach(h => {
+    const inH = items.filter(i => i.huvud === h.key);
+    if (inH.length === 0) return;
     const group = document.createElement('div');
     group.className = 'inv-group';
-    group.innerHTML = `<div class="inv-group-title">${cat.label}</div>`;
-    inCat.forEach(item => group.appendChild(renderInventoryItem(item)));
+    group.innerHTML = `<div class="inv-group-title">${h.label}</div>`;
+
+    // Gruppera per underkategori-namn.
+    const bySub = {};
+    inH.forEach(i => {
+      const namn = (subById[i.underkategoriId] && subById[i.underkategoriId].namn) || 'Övrigt';
+      (bySub[namn] = bySub[namn] || []).push(i);
+    });
+    Object.keys(bySub).sort((a, b) => a.localeCompare(b)).forEach(subNamn => {
+      const sub = document.createElement('div');
+      sub.className = 'inv-subgroup';
+      sub.innerHTML = `<div class="inv-sub-title">${escapeHtml(subNamn)}</div>`;
+      bySub[subNamn].forEach(item => sub.appendChild(renderInventoryItem(item)));
+      group.appendChild(sub);
+    });
     wrap.appendChild(group);
   });
 }
@@ -851,8 +920,9 @@ function renderInventoryItem(item) {
   const step = item.enhet === 'antal' ? 1 : 0.5;
   const row = document.createElement('div');
   row.className = 'inv-item';
+  const art = item.artikelnummer ? `<small class="inv-art">#${escapeHtml(item.artikelnummer)}</small>` : '';
   row.innerHTML = `
-    <span class="inv-name">${escapeHtml(item.namn)}</span>
+    <span class="inv-name">${escapeHtml(item.namn)}${art}</span>
     <div class="inv-stepper">
       <button type="button" class="inv-step" data-act="dec" aria-label="Minska">−</button>
       <div class="inv-qty" data-act="edit">
@@ -925,6 +995,21 @@ function setSeg(segSelector, hiddenSelector, value, dataAttr) {
   });
 }
 
+// Fyller underkategori-dropdownen för ett huvud, med valt id om angivet.
+function fillSubcatSelect(huvud, selectedId) {
+  const select = $('#item-underkategori');
+  const subs = Store.subcategoriesFor(huvud).slice().sort((a, b) => a.namn.localeCompare(b.namn));
+  select.innerHTML = '';
+  subs.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s.id;
+    opt.textContent = s.namn;
+    select.appendChild(opt);
+  });
+  if (selectedId && subs.some(s => s.id === selectedId)) select.value = selectedId;
+  else if (subs.length) select.selectedIndex = 0;
+}
+
 function openItemModal(itemId) {
   const modal = $('#item-modal');
   const deleteBtn = $('#item-delete');
@@ -934,7 +1019,9 @@ function openItemModal(itemId) {
     $('#item-modal-title').textContent = 'Redigera vara';
     $('#item-id').value = item.id;
     $('#item-name').value = item.namn;
-    setSeg('#item-kategori-seg', '#item-kategori', item.kategori, 'kategori');
+    setSeg('#item-huvud-seg', '#item-huvud', item.huvud, 'huvud');
+    fillSubcatSelect(item.huvud, item.underkategoriId);
+    $('#item-artikelnummer').value = item.artikelnummer || '';
     setSeg('#item-enhet-seg', '#item-enhet', item.enhet, 'enhet');
     $('#item-antal').value = item.antal;
     deleteBtn.classList.remove('hidden');
@@ -942,7 +1029,9 @@ function openItemModal(itemId) {
     $('#item-modal-title').textContent = 'Ny vara';
     $('#item-form').reset();
     $('#item-id').value = '';
-    setSeg('#item-kategori-seg', '#item-kategori', 'varmt', 'kategori');
+    setSeg('#item-huvud-seg', '#item-huvud', 'forrad', 'huvud');
+    fillSubcatSelect('forrad');
+    $('#item-artikelnummer').value = '';
     setSeg('#item-enhet-seg', '#item-enhet', 'kg', 'enhet');
     $('#item-antal').value = '0';
     deleteBtn.classList.add('hidden');
@@ -954,11 +1043,27 @@ function closeItemModal() { $('#item-modal').classList.add('hidden'); }
 $('#add-item-btn').addEventListener('click', () => openItemModal(null));
 $('#item-cancel').addEventListener('click', closeItemModal);
 
-document.querySelectorAll('#item-kategori-seg .seg-btn').forEach(btn => {
-  btn.addEventListener('click', () => setSeg('#item-kategori-seg', '#item-kategori', btn.dataset.kategori, 'kategori'));
+document.querySelectorAll('#item-huvud-seg .seg-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    setSeg('#item-huvud-seg', '#item-huvud', btn.dataset.huvud, 'huvud');
+    fillSubcatSelect(btn.dataset.huvud);
+  });
 });
 document.querySelectorAll('#item-enhet-seg .seg-btn').forEach(btn => {
   btn.addEventListener('click', () => setSeg('#item-enhet-seg', '#item-enhet', btn.dataset.enhet, 'enhet'));
+});
+
+$('#item-sub-new').addEventListener('click', async () => {
+  const huvud = $('#item-huvud').value;
+  const namn = (prompt('Namn på ny underkategori:') || '').trim();
+  if (!namn) return;
+  try {
+    const id = await Store.addSubcategory(huvud, namn);
+    fillSubcatSelect(huvud, id);
+  } catch (err) {
+    console.error(err);
+    showToast('Kunde inte skapa underkategori');
+  }
 });
 
 $('#item-form').addEventListener('submit', async (e) => {
@@ -966,11 +1071,14 @@ $('#item-form').addEventListener('submit', async (e) => {
   const item = {
     id: $('#item-id').value || null,
     namn: $('#item-name').value.trim(),
-    kategori: $('#item-kategori').value,
+    huvud: $('#item-huvud').value,
+    underkategoriId: $('#item-underkategori').value || null,
+    artikelnummer: $('#item-artikelnummer').value.trim(),
     enhet: $('#item-enhet').value,
     antal: Math.max(0, parseFloat($('#item-antal').value) || 0),
   };
   if (!item.namn) return;
+  if (!item.underkategoriId) { showToast('Välj en underkategori'); return; }
   try {
     await Store.saveItem(item);
     closeItemModal();
@@ -997,6 +1105,100 @@ $('#item-delete').addEventListener('click', async () => {
   }
 });
 
+// --- Inventering: sammanfatta & nollställ + historik ---
+$('#snapshot-btn').addEventListener('click', async () => {
+  if (Store.getInventory().length === 0) { showToast('Inget att sammanfatta'); return; }
+  if (!confirm('Spara en sammanfattning av lagret och nollställ alla antal?')) return;
+  try {
+    await Store.saveSnapshotAndReset();
+    renderInventory();
+    showToast('Inventering sparad, antal nollställda');
+  } catch (err) {
+    console.error(err);
+    showToast('Kunde inte spara – kolla nätet');
+  }
+});
+
+let currentSnapshot = null;
+
+async function openSnapshots() {
+  $('#snapshot-detail').classList.add('hidden');
+  $('#snapshot-detail').innerHTML = '';
+  $('#snapshot-export').classList.add('hidden');
+  $('#snapshots-list').classList.remove('hidden');
+  $('#snapshots-title').textContent = 'Tidigare inventeringar';
+  $('#snapshots-modal').classList.remove('hidden');
+  renderSnapshotList(await Store.getSnapshots());
+}
+
+function renderSnapshotList(snaps) {
+  const list = $('#snapshots-list');
+  list.innerHTML = '';
+  $('#snapshots-empty').classList.toggle('hidden', snaps.length > 0);
+  snaps.forEach(s => {
+    const who = s.skapad_av ? s.skapad_av.split('@')[0] : '';
+    const count = Array.isArray(s.data) ? s.data.length : 0;
+    const card = document.createElement('div');
+    card.className = 'reading-card snap-card';
+    card.innerHTML = `<div class="row">
+      <span class="when">${formatDateTime(s.skapad_at)}${who ? ' · ' + escapeHtml(who) : ''}</span>
+      <span class="val">${count} varor</span></div>`;
+    card.addEventListener('click', () => showSnapshotDetail(s));
+    list.appendChild(card);
+  });
+}
+
+function showSnapshotDetail(s) {
+  currentSnapshot = s;
+  $('#snapshots-list').classList.add('hidden');
+  $('#snapshots-empty').classList.add('hidden');
+  $('#snapshots-title').textContent = formatDateTime(s.skapad_at);
+  const data = Array.isArray(s.data) ? s.data : [];
+  let html = '';
+  ['forrad', 'kyl', 'frys'].forEach(h => {
+    const inH = data.filter(d => d.huvud === h);
+    if (!inH.length) return;
+    html += `<div class="inv-group-title">${HUVUD_LABEL[h] || h}</div>`;
+    inH.forEach(d => {
+      const art = d.artikelnummer ? ` · #${escapeHtml(d.artikelnummer)}` : '';
+      html += `<div class="snap-row">
+        <span>${escapeHtml(d.namn)}<small>${escapeHtml(d.underkategori || '')}${art}</small></span>
+        <span class="snap-amt">${formatNum(d.antal)} ${escapeHtml(d.enhet)}</span></div>`;
+    });
+  });
+  const detail = $('#snapshot-detail');
+  detail.innerHTML = html || '<p class="empty-msg">Tomt.</p>';
+  detail.classList.remove('hidden');
+  $('#snapshot-export').classList.remove('hidden');
+}
+
+$('#snapshots-history-btn').addEventListener('click', openSnapshots);
+
+$('#snapshots-close').addEventListener('click', () => {
+  // Från detaljvy → tillbaka till listan; annars stäng modalen.
+  if (!$('#snapshot-detail').classList.contains('hidden')) {
+    $('#snapshot-detail').classList.add('hidden');
+    $('#snapshot-export').classList.add('hidden');
+    $('#snapshots-list').classList.remove('hidden');
+    $('#snapshots-title').textContent = 'Tidigare inventeringar';
+    currentSnapshot = null;
+  } else {
+    $('#snapshots-modal').classList.add('hidden');
+  }
+});
+
+$('#snapshot-export').addEventListener('click', () => {
+  if (!currentSnapshot) return;
+  const data = Array.isArray(currentSnapshot.data) ? currentSnapshot.data : [];
+  const rows = [['Huvudkategori', 'Underkategori', 'Vara', 'Artikelnummer', 'Antal', 'Enhet']];
+  data.forEach(d => rows.push([
+    HUVUD_LABEL[d.huvud] || d.huvud, d.underkategori || '', d.namn,
+    d.artikelnummer || '', String(d.antal).replace('.', ','), d.enhet,
+  ]));
+  downloadCsv(rows, `inventering_${String(currentSnapshot.skapad_at).slice(0, 10)}.csv`);
+  showToast('CSV-fil nedladdad');
+});
+
 // ---------------------------------------------------------------------------
 // Realtid: uppdatera cachen och vyn när någon annan ändrar data.
 // ---------------------------------------------------------------------------
@@ -1016,11 +1218,20 @@ function onRemoteChange() {
   }, 150);
 }
 
+function onSnapshotsChange() {
+  const modal = $('#snapshots-modal');
+  if (!modal.classList.contains('hidden') && !$('#snapshots-list').classList.contains('hidden')) {
+    Store.getSnapshots().then(renderSnapshotList);
+  }
+}
+
 function subscribeRealtime() {
   window.sb.channel('db-changes')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'units' }, onRemoteChange)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'readings' }, onRemoteChange)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory' }, onRemoteChange)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'subcategories' }, onRemoteChange)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_snapshots' }, onSnapshotsChange)
     .subscribe();
 }
 
