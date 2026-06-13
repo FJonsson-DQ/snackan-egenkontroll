@@ -42,13 +42,25 @@ function mapReadingFromDb(r) {
     tidpunkt: r.tidpunkt,
   };
 }
+function mapItemFromDb(i) {
+  return {
+    id: i.id,
+    namn: i.namn,
+    kategori: i.kategori,
+    enhet: i.enhet,
+    antal: Number(i.antal),
+    updated_by: i.updated_by || '',
+  };
+}
 
 const Store = {
   units: [],
   readings: [],
+  inventory: [],
 
   getUnits() { return this.units; },
   getReadings() { return this.readings; },
+  getInventory() { return this.inventory; },
 
   readingsForUnit(unitId) {
     return this.readings
@@ -62,14 +74,17 @@ const Store = {
 
   // Hämtar all delad data från molnet till cachen.
   async load() {
-    const [unitsRes, readingsRes] = await Promise.all([
+    const [unitsRes, readingsRes, invRes] = await Promise.all([
       window.sb.from('units').select('*').order('created_at', { ascending: true }),
       window.sb.from('readings').select('*').order('tidpunkt', { ascending: false }),
+      window.sb.from('inventory').select('*').order('namn', { ascending: true }),
     ]);
     if (unitsRes.error) console.error('Kunde inte hämta enheter:', unitsRes.error);
     if (readingsRes.error) console.error('Kunde inte hämta loggar:', readingsRes.error);
+    if (invRes.error) console.error('Kunde inte hämta lager:', invRes.error);
     this.units = (unitsRes.data || []).map(mapUnitFromDb);
     this.readings = (readingsRes.data || []).map(mapReadingFromDb);
+    this.inventory = (invRes.data || []).map(mapItemFromDb);
   },
 
   async saveUnit(unit) {
@@ -103,6 +118,43 @@ const Store = {
     });
     if (error) throw error;
     await this.load();
+  },
+
+  // --- Lager (inventory) ---
+  async saveItem(item) {
+    const fields = {
+      namn: item.namn,
+      kategori: item.kategori,
+      enhet: item.enhet,
+      antal: item.antal,
+      updated_by: window.currentUserEmail || null,
+      updated_at: new Date().toISOString(),
+    };
+    if (item.id) {
+      const { error } = await window.sb.from('inventory').update(fields).eq('id', item.id);
+      if (error) throw error;
+    } else {
+      const { error } = await window.sb.from('inventory').insert(fields);
+      if (error) throw error;
+    }
+    await this.load();
+  },
+
+  async deleteItem(id) {
+    const { error } = await window.sb.from('inventory').delete().eq('id', id);
+    if (error) throw error;
+    await this.load();
+  },
+
+  // Sätter en varas antal (>= 0). Uppdaterar cachen direkt för snabb känsla.
+  async setAmount(id, antal) {
+    const value = Math.max(0, Math.round(antal * 100) / 100);
+    const item = this.inventory.find(i => i.id === id);
+    if (item) item.antal = value; // optimistiskt
+    const { error } = await window.sb.from('inventory')
+      .update({ antal: value, updated_by: window.currentUserEmail || null, updated_at: new Date().toISOString() })
+      .eq('id', id);
+    if (error) throw error;
   },
 };
 
@@ -191,6 +243,7 @@ function showView(name) {
   if (name === 'units') renderUnits();
   if (name === 'log') renderLogForm();
   if (name === 'history') renderHistory();
+  if (name === 'lager') renderInventory();
 }
 
 document.querySelectorAll('.nav-btn').forEach(btn => {
@@ -752,6 +805,187 @@ $('#export-all-btn').addEventListener('click', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Vy: Lager (inventory)
+// ---------------------------------------------------------------------------
+const KATEGORIER = [
+  { key: 'varmt', label: 'Varmt' },
+  { key: 'kyl', label: 'Kyl' },
+  { key: 'frys', label: 'Frys' },
+];
+
+function formatAmount(item) {
+  const n = item.antal;
+  return Number.isInteger(n) ? String(n) : String(n).replace('.', ',');
+}
+
+function renderInventory() {
+  const wrap = $('#inventory-list');
+  const items = Store.getInventory();
+  wrap.innerHTML = '';
+  $('#inventory-empty').classList.toggle('hidden', items.length > 0);
+
+  KATEGORIER.forEach(cat => {
+    const inCat = items.filter(i => i.kategori === cat.key);
+    if (inCat.length === 0) return;
+    const group = document.createElement('div');
+    group.className = 'inv-group';
+    group.innerHTML = `<div class="inv-group-title">${cat.label}</div>`;
+    inCat.forEach(item => group.appendChild(renderInventoryItem(item)));
+    wrap.appendChild(group);
+  });
+}
+
+function renderInventoryItem(item) {
+  const step = item.enhet === 'antal' ? 1 : 0.5;
+  const row = document.createElement('div');
+  row.className = 'inv-item';
+  row.innerHTML = `
+    <span class="inv-name">${escapeHtml(item.namn)}</span>
+    <div class="inv-stepper">
+      <button type="button" class="inv-step" data-act="dec" aria-label="Minska">−</button>
+      <div class="inv-qty" data-act="edit">
+        <span class="num">${formatAmount(item)}</span>
+        <span class="unit">${item.enhet}</span>
+      </div>
+      <button type="button" class="inv-step" data-act="inc" aria-label="Öka">+</button>
+    </div>
+  `;
+
+  // Hela raden (utom stepper) öppnar redigering av varan.
+  row.addEventListener('click', () => openItemModal(item.id));
+  row.querySelector('.inv-stepper').addEventListener('click', (e) => e.stopPropagation());
+
+  row.querySelector('[data-act="dec"]').addEventListener('click', () => adjustItem(item, -step));
+  row.querySelector('[data-act="inc"]').addEventListener('click', () => adjustItem(item, step));
+  row.querySelector('[data-act="edit"]').addEventListener('click', () => editAmountInline(item, row));
+  return row;
+}
+
+async function adjustItem(item, delta) {
+  const next = Math.max(0, Math.round((item.antal + delta) * 100) / 100);
+  try {
+    await Store.setAmount(item.id, next);
+    renderInventory();
+  } catch (err) {
+    console.error(err);
+    showToast('Kunde inte uppdatera – kolla nätet');
+    await Store.load();
+    renderInventory();
+  }
+}
+
+// Tryck på mängden → byt till ett inmatningsfält för exakt värde.
+function editAmountInline(item, row) {
+  const qty = row.querySelector('.inv-qty');
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.step = item.enhet === 'antal' ? '1' : '0.1';
+  input.inputMode = 'decimal';
+  input.className = 'inv-qty-input';
+  input.value = item.antal;
+  qty.replaceWith(input);
+  input.focus();
+  input.select();
+
+  let done = false;
+  const commit = async () => {
+    if (done) return;
+    done = true;
+    const val = parseFloat(input.value);
+    if (!Number.isNaN(val)) {
+      try { await Store.setAmount(item.id, val); }
+      catch (err) { console.error(err); showToast('Kunde inte spara'); await Store.load(); }
+    }
+    renderInventory();
+  };
+  input.addEventListener('blur', commit);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+    if (e.key === 'Escape') { done = true; renderInventory(); }
+  });
+}
+
+// --- Modal: lägg till / redigera vara ---
+function setSeg(segSelector, hiddenSelector, value, dataAttr) {
+  $(hiddenSelector).value = value;
+  document.querySelectorAll(`${segSelector} .seg-btn`).forEach(b => {
+    b.classList.toggle('active', b.dataset[dataAttr] === value);
+  });
+}
+
+function openItemModal(itemId) {
+  const modal = $('#item-modal');
+  const deleteBtn = $('#item-delete');
+  if (itemId) {
+    const item = Store.getInventory().find(i => i.id === itemId);
+    if (!item) return;
+    $('#item-modal-title').textContent = 'Redigera vara';
+    $('#item-id').value = item.id;
+    $('#item-name').value = item.namn;
+    setSeg('#item-kategori-seg', '#item-kategori', item.kategori, 'kategori');
+    setSeg('#item-enhet-seg', '#item-enhet', item.enhet, 'enhet');
+    $('#item-antal').value = item.antal;
+    deleteBtn.classList.remove('hidden');
+  } else {
+    $('#item-modal-title').textContent = 'Ny vara';
+    $('#item-form').reset();
+    $('#item-id').value = '';
+    setSeg('#item-kategori-seg', '#item-kategori', 'varmt', 'kategori');
+    setSeg('#item-enhet-seg', '#item-enhet', 'kg', 'enhet');
+    $('#item-antal').value = '0';
+    deleteBtn.classList.add('hidden');
+  }
+  modal.classList.remove('hidden');
+}
+function closeItemModal() { $('#item-modal').classList.add('hidden'); }
+
+$('#add-item-btn').addEventListener('click', () => openItemModal(null));
+$('#item-cancel').addEventListener('click', closeItemModal);
+
+document.querySelectorAll('#item-kategori-seg .seg-btn').forEach(btn => {
+  btn.addEventListener('click', () => setSeg('#item-kategori-seg', '#item-kategori', btn.dataset.kategori, 'kategori'));
+});
+document.querySelectorAll('#item-enhet-seg .seg-btn').forEach(btn => {
+  btn.addEventListener('click', () => setSeg('#item-enhet-seg', '#item-enhet', btn.dataset.enhet, 'enhet'));
+});
+
+$('#item-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const item = {
+    id: $('#item-id').value || null,
+    namn: $('#item-name').value.trim(),
+    kategori: $('#item-kategori').value,
+    enhet: $('#item-enhet').value,
+    antal: Math.max(0, parseFloat($('#item-antal').value) || 0),
+  };
+  if (!item.namn) return;
+  try {
+    await Store.saveItem(item);
+    closeItemModal();
+    renderInventory();
+    showToast('Vara sparad');
+  } catch (err) {
+    console.error(err);
+    showToast('Kunde inte spara – kolla nätet');
+  }
+});
+
+$('#item-delete').addEventListener('click', async () => {
+  const id = $('#item-id').value;
+  if (!id) return;
+  if (!confirm('Ta bort varan?')) return;
+  try {
+    await Store.deleteItem(id);
+    closeItemModal();
+    renderInventory();
+    showToast('Vara borttagen');
+  } catch (err) {
+    console.error(err);
+    showToast('Kunde inte ta bort – kolla nätet');
+  }
+});
+
+// ---------------------------------------------------------------------------
 // Realtid: uppdatera cachen och vyn när någon annan ändrar data.
 // ---------------------------------------------------------------------------
 let realtimeTimer = null;
@@ -761,11 +995,12 @@ function onRemoteChange() {
   realtimeTimer = setTimeout(async () => {
     await Store.load();
     // Rita om aktuell vy. Logg-vyn lämnas ifred så pågående inmatning inte
-    // skrivs över; Enheter och Historik är säkra att rita om.
+    // skrivs över; övriga vyer är säkra att rita om.
     const active = document.querySelector('.nav-btn.active');
     const view = active ? active.dataset.view : 'units';
     if (view === 'units') renderUnits();
     else if (view === 'history') renderHistoryList();
+    else if (view === 'lager') renderInventory();
   }, 150);
 }
 
@@ -773,6 +1008,7 @@ function subscribeRealtime() {
   window.sb.channel('db-changes')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'units' }, onRemoteChange)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'readings' }, onRemoteChange)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory' }, onRemoteChange)
     .subscribe();
 }
 

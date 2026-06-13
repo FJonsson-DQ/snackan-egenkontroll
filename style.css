@@ -408,6 +408,68 @@ main {
 /* Obligatorisk åtgärd vid avvikelse */
 #note-label.required { color: var(--red); }
 
+/* Lager */
+.inv-group { margin-bottom: 18px; }
+.inv-group-title {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  font-weight: 700;
+  margin: 0 0 8px 2px;
+}
+.inv-item {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.inv-item:active { background: var(--seafoam-soft); }
+.inv-name { flex: 1; min-width: 0; font-weight: 600; }
+.inv-stepper { display: flex; align-items: center; gap: 6px; flex: none; }
+.inv-step {
+  width: 42px;
+  height: 42px;
+  flex: none;
+  border: 1px solid var(--border);
+  background: var(--input-bg);
+  border-radius: 10px;
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: var(--green-deep);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.inv-step:active { background: var(--seafoam-soft); }
+.inv-qty {
+  min-width: 70px;
+  text-align: center;
+  cursor: pointer;
+  line-height: 1.15;
+}
+.inv-qty .num { font-weight: 700; font-size: 1.1rem; }
+.inv-qty .unit { display: block; font-weight: 400; font-size: 0.7rem; color: var(--muted); }
+.inv-qty-input {
+  width: 70px;
+  text-align: center;
+  font-size: 1.1rem;
+  font-weight: 700;
+  padding: 6px;
+  border: 1px solid var(--green-deep);
+  border-radius: 8px;
+  background: var(--input-bg);
+  color: var(--text);
+}
+
 .warning {
   background: var(--red-bg);
   border: 1px solid var(--red);
