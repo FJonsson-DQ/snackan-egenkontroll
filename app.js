@@ -191,8 +191,9 @@ const Store = {
     await this.load();
   },
 
-  // --- Inventering (ögonblicksbild + nollställ) ---
-  async saveSnapshotAndReset() {
+  // --- Inventering ---
+  // Sparar en ögonblicksbild av lagret (utan att röra antalen).
+  async saveSnapshot() {
     const subById = Object.fromEntries(this.subcategories.map(s => [s.id, s.namn]));
     const data = this.inventory.map(i => ({
       namn: i.namn,
@@ -202,17 +203,19 @@ const Store = {
       enhet: i.enhet,
       antal: i.antal,
     }));
-    const { error: insErr } = await window.sb.from('inventory_snapshots')
+    const { error } = await window.sb.from('inventory_snapshots')
       .insert({ skapad_av: window.currentUserEmail || null, data });
-    if (insErr) throw insErr;
-    // Nollställ alla antal
+    if (error) throw error;
+  },
+
+  // Nollställer alla varors antal (utan att spara något).
+  async resetAllAmounts() {
     const ids = this.inventory.map(i => i.id);
-    if (ids.length) {
-      const { error: updErr } = await window.sb.from('inventory')
-        .update({ antal: 0, updated_by: window.currentUserEmail || null, updated_at: new Date().toISOString() })
-        .in('id', ids);
-      if (updErr) throw updErr;
-    }
+    if (!ids.length) return;
+    const { error } = await window.sb.from('inventory')
+      .update({ antal: 0, updated_by: window.currentUserEmail || null, updated_at: new Date().toISOString() })
+      .in('id', ids);
+    if (error) throw error;
     await this.load();
   },
 
@@ -1227,17 +1230,45 @@ $('#item-delete').addEventListener('click', async () => {
   }
 });
 
-// --- Inventering: sammanfatta & nollställ + historik ---
+// --- Inventering: sammanfatta + nollställ + historik ---
 $('#snapshot-btn').addEventListener('click', async () => {
   if (Store.getInventory().length === 0) { showToast('Inget att sammanfatta'); return; }
-  if (!confirm('Spara en sammanfattning av lagret och nollställ alla antal?')) return;
   try {
-    await Store.saveSnapshotAndReset();
-    renderInventory();
-    showToast('Inventering sparad, antal nollställda');
+    await Store.saveSnapshot();
+    showToast('Inventering sparad');
   } catch (err) {
     console.error(err);
     showToast('Kunde inte spara – kolla nätet');
+  }
+});
+
+// Nollställ med "tryck igen för att bekräfta" (pålitligt även i hemskärms-appen).
+let resetArmed = false;
+let resetTimer = null;
+const resetBtn = $('#reset-btn');
+function disarmReset() {
+  resetArmed = false;
+  clearTimeout(resetTimer);
+  resetBtn.textContent = 'Nollställ';
+  resetBtn.classList.remove('btn-danger');
+}
+resetBtn.addEventListener('click', async () => {
+  if (Store.getInventory().length === 0) { showToast('Inget att nollställa'); return; }
+  if (!resetArmed) {
+    resetArmed = true;
+    resetBtn.textContent = 'Bekräfta nollställ?';
+    resetBtn.classList.add('btn-danger');
+    resetTimer = setTimeout(disarmReset, 4000);
+    return;
+  }
+  disarmReset();
+  try {
+    await Store.resetAllAmounts();
+    renderInventory();
+    showToast('Alla antal nollställda');
+  } catch (err) {
+    console.error(err);
+    showToast('Kunde inte nollställa – kolla nätet');
   }
 });
 
