@@ -74,7 +74,7 @@ async function isAllowed(email) {
   const { data, error } = await window.sb
     .from('allowed_users')
     .select('email')
-    .eq('email', email)
+    .ilike('email', (email || '').trim())
     .maybeSingle();
   if (error) {
     console.error('Tillåtlista-fel:', error);
