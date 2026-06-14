@@ -904,9 +904,9 @@ const HUVUD = [
   { key: 'forrad', label: 'Skafferi' },
   { key: 'kyl', label: 'Kyl' },
   { key: 'frys', label: 'Frys' },
-  { key: 'tillbehor', label: 'Tillbehör' },
+  { key: 'tillbehor', label: 'Förråd' },
 ];
-const HUVUD_LABEL = { forrad: 'Skafferi', kyl: 'Kyl', frys: 'Frys', tillbehor: 'Tillbehör' };
+const HUVUD_LABEL = { forrad: 'Skafferi', kyl: 'Kyl', frys: 'Frys', tillbehor: 'Förråd' };
 
 function formatNum(n) {
   return Number.isInteger(n) ? String(n) : String(n).replace('.', ',');
