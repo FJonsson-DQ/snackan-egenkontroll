@@ -325,6 +325,7 @@ function showView(name) {
   if (name === 'log') renderLogForm();
   if (name === 'history') renderHistory();
   if (name === 'lager') renderInventory();
+  try { localStorage.setItem('bowsapp.view', name); } catch (e) {}
 }
 
 document.querySelectorAll('.nav-btn').forEach(btn => {
@@ -1091,6 +1092,21 @@ function fillSubcatSelect(huvud, selectedId) {
   updateSubActions();
 }
 
+// Som fillSubcatSelect, men skapar en "Övrigt"-underkategori om huvudkategorin
+// saknar underkategorier (annars går det inte att spara en vara där, t.ex. Förråd).
+async function ensureSubsAndFill(huvud, selectedId) {
+  if (Store.subcategoriesFor(huvud).length === 0) {
+    try {
+      const id = await Store.addSubcategory(huvud, 'Övrigt');
+      fillSubcatSelect(huvud, id);
+      return;
+    } catch (err) {
+      console.error(err);
+    }
+  }
+  fillSubcatSelect(huvud, selectedId);
+}
+
 // Visar Byt namn/Ta bort om vald underkategori inte är skyddade "Övrigt".
 function updateSubActions() {
   const id = $('#item-underkategori').value;
@@ -1120,7 +1136,7 @@ function openItemModal(itemId) {
     $('#item-form').reset();
     $('#item-id').value = '';
     setSeg('#item-huvud-seg', '#item-huvud', 'forrad', 'huvud');
-    fillSubcatSelect('forrad');
+    ensureSubsAndFill('forrad');
     $('#item-artikelnummer').value = '';
     setSeg('#item-enhet-seg', '#item-enhet', 'kg', 'enhet');
     $('#item-antal').value = '0';
@@ -1140,7 +1156,7 @@ $('#inv-search').addEventListener('input', renderInventory);
 document.querySelectorAll('#item-huvud-seg .seg-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     setSeg('#item-huvud-seg', '#item-huvud', btn.dataset.huvud, 'huvud');
-    fillSubcatSelect(btn.dataset.huvud);
+    ensureSubsAndFill(btn.dataset.huvud);
     hideNewSubRow();
   });
 });
@@ -1507,6 +1523,12 @@ window.onAppReady = async function () {
   if (appStarted) return;
   appStarted = true;
   await Store.load();
-  showView('units');
+  const validViews = ['units', 'log', 'lager', 'history'];
+  let startView = 'units';
+  try {
+    const saved = localStorage.getItem('bowsapp.view');
+    if (validViews.includes(saved)) startView = saved;
+  } catch (e) {}
+  showView(startView);
   subscribeRealtime();
 };
