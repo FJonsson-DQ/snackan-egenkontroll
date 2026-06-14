@@ -901,11 +901,12 @@ $('#export-all-btn').addEventListener('click', () => {
 // Vy: Lager (inventory)
 // ---------------------------------------------------------------------------
 const HUVUD = [
-  { key: 'forrad', label: 'Förråd' },
+  { key: 'forrad', label: 'Skafferi' },
   { key: 'kyl', label: 'Kyl' },
   { key: 'frys', label: 'Frys' },
+  { key: 'tillbehor', label: 'Tillbehör' },
 ];
-const HUVUD_LABEL = { forrad: 'Förråd', kyl: 'Kyl', frys: 'Frys' };
+const HUVUD_LABEL = { forrad: 'Skafferi', kyl: 'Kyl', frys: 'Frys', tillbehor: 'Tillbehör' };
 
 function formatNum(n) {
   return Number.isInteger(n) ? String(n) : String(n).replace('.', ',');
@@ -930,11 +931,27 @@ function toggleCollapsed(key) {
 
 function renderInventory() {
   const wrap = $('#inventory-list');
-  const items = Store.getInventory();
+  const searchInput = $('#inv-search');
+  const term = (searchInput ? searchInput.value : '').trim().toLowerCase();
+  let items = Store.getInventory();
+  if (term) {
+    items = items.filter(i =>
+      i.namn.toLowerCase().includes(term) ||
+      (i.artikelnummer && i.artikelnummer.toLowerCase().includes(term)));
+  }
   wrap.innerHTML = '';
-  $('#inventory-empty').classList.toggle('hidden', items.length > 0);
+  const empty = $('#inventory-empty');
+  if (items.length === 0) {
+    empty.classList.remove('hidden');
+    empty.innerHTML = term
+      ? 'Inga varor matchar sökningen.'
+      : 'Inga varor än.<br>Tryck på "Lägg till" för att börja fylla lagret.';
+  } else {
+    empty.classList.add('hidden');
+  }
   const subById = Object.fromEntries(Store.getSubcategories().map(s => [s.id, s]));
   const collapsed = getCollapsed();
+  const searching = term.length > 0; // vid sökning visas allt utfällt
 
   HUVUD.forEach(h => {
     const inH = items.filter(i => i.huvud === h.key);
@@ -943,7 +960,7 @@ function renderInventory() {
     group.className = 'inv-group';
 
     const hKey = 'h:' + h.key;
-    const hCollapsed = collapsed.has(hKey);
+    const hCollapsed = !searching && collapsed.has(hKey);
     const title = document.createElement('div');
     title.className = 'inv-group-title' + (hCollapsed ? ' collapsed' : '');
     title.innerHTML = `<span class="inv-chevron">▸</span><span>${h.label}</span><span class="inv-count">${inH.length}</span>`;
@@ -961,7 +978,7 @@ function renderInventory() {
         const sub = document.createElement('div');
         sub.className = 'inv-subgroup';
         const sKey = 's:' + h.key + ':' + subNamn;
-        const sCollapsed = collapsed.has(sKey);
+        const sCollapsed = !searching && collapsed.has(sKey);
         const subTitle = document.createElement('div');
         subTitle.className = 'inv-sub-title' + (sCollapsed ? ' collapsed' : '');
         subTitle.innerHTML = `<span class="inv-chevron">▸</span><span>${escapeHtml(subNamn)}</span><span class="inv-count">${bySub[subNamn].length}</span>`;
@@ -1116,6 +1133,9 @@ function closeItemModal() { $('#item-modal').classList.add('hidden'); }
 
 $('#add-item-btn').addEventListener('click', () => openItemModal(null));
 $('#item-cancel').addEventListener('click', closeItemModal);
+
+// Sökruta: filtrera lagerlistan medan man skriver.
+$('#inv-search').addEventListener('input', renderInventory);
 
 document.querySelectorAll('#item-huvud-seg .seg-btn').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -1353,7 +1373,7 @@ function renderSnapshotDetail() {
     detail.innerHTML = '<p class="empty-msg">Inga varor i den här inventeringen.</p>';
     return;
   }
-  ['forrad', 'kyl', 'frys'].forEach(h => {
+  HUVUD.map(x => x.key).forEach(h => {
     const rows = snapEdit.map((d, i) => ({ d, i })).filter(x => x.d.huvud === h);
     if (!rows.length) return;
     const head = document.createElement('div');

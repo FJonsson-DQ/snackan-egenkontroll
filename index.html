@@ -132,11 +132,12 @@
 
     <!-- Vy: Lager -->
     <section id="view-lager" class="view hidden">
-      <div class="view-head">
-        <h2>Lager</h2>
+      <div class="view-head"><h2>Lager</h2></div>
+      <div class="inv-toolbar">
+        <input id="inv-search" type="search" class="inv-search" placeholder="Sök vara…" autocomplete="off">
         <button class="btn btn-primary" id="add-item-btn">
           <svg class="icon" viewBox="0 0 24 24"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5Z" fill="currentColor"/></svg>
-          Lägg till vara
+          Lägg till
         </button>
       </div>
       <div class="lager-actions">
@@ -231,10 +232,11 @@
         </label>
         <label>
           Huvudkategori
-          <div class="seg" id="item-huvud-seg">
-            <button type="button" class="seg-btn active" data-huvud="forrad">Förråd</button>
+          <div class="seg seg-wrap" id="item-huvud-seg">
+            <button type="button" class="seg-btn active" data-huvud="forrad">Skafferi</button>
             <button type="button" class="seg-btn" data-huvud="kyl">Kyl</button>
             <button type="button" class="seg-btn" data-huvud="frys">Frys</button>
+            <button type="button" class="seg-btn" data-huvud="tillbehor">Tillbehör</button>
           </div>
           <input type="hidden" id="item-huvud" value="forrad">
         </label>

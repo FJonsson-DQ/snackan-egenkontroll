@@ -643,6 +643,24 @@ input[type="number"] {
   color: #fff;
   font-weight: 600;
 }
+/* Segment med många knappar (huvudkategorier) – mindre text så allt får plats */
+.seg-wrap .seg-btn { font-size: 0.82rem; padding: 12px 2px; }
+
+/* Sök-verktygsrad på Lager */
+.inv-toolbar { display: flex; gap: 8px; margin-bottom: 12px; }
+.inv-toolbar .btn { flex: none; }
+.inv-search {
+  flex: 1;
+  min-width: 0;
+  font-family: inherit;
+  font-size: 1rem;
+  padding: 12px;
+  min-height: 48px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--input-bg);
+  color: var(--text);
+}
 
 /* ------- Modal ------- */
 .modal {
