@@ -57,6 +57,13 @@ function mapItemFromDb(i) {
 function mapSubcatFromDb(s) {
   return { id: s.id, huvud: s.huvud, namn: s.namn };
 }
+// Lokalt datum (YYYY-MM-DD) för att gruppera inventeringar per kalenderdag.
+function localDateStr(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
 
 const Store = {
   units: [],
@@ -215,9 +222,19 @@ const Store = {
         enhet: i.enhet,
         antal: i.antal,
       }));
-    const { error } = await window.sb.from('inventory_snapshots')
-      .insert({ skapad_av: window.currentUserEmail || null, data });
-    if (error) throw error;
+    // En inventering per dag: uppdatera dagens om den redan finns, annars skapa ny.
+    const today = localDateStr(new Date());
+    const snaps = await this.getSnapshots();
+    const existing = snaps.find(s => s.skapad_at && localDateStr(new Date(s.skapad_at)) === today);
+    if (existing) {
+      const { error } = await window.sb.from('inventory_snapshots')
+        .update({ data, skapad_av: window.currentUserEmail || null }).eq('id', existing.id);
+      if (error) throw error;
+    } else {
+      const { error } = await window.sb.from('inventory_snapshots')
+        .insert({ skapad_av: window.currentUserEmail || null, data });
+      if (error) throw error;
+    }
   },
 
   // Nollställer alla varors antal (utan att spara något).
