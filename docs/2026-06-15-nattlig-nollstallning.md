@@ -22,6 +22,12 @@ midnatt), så det riktar in sig på **gårdagens** datum (svensk tid). Finns red
 inventering för den dagen (t.ex. en manuell "Sammanfatta") uppdateras den istället för att
 en ny skapas. Den manuella knappen i appen följer samma regel fast för dagens datum.
 
+**Namn (skapad_av).** Jobbet sätter inte "System". Finns redan dagens inventering behålls
+det namn som den manuella summeringen satte. Skapas en ny (ingen summerade manuellt) sätts
+namnet till den senaste verkliga användaren som ändrade ett antal den dagen (systemet
+exkluderas). Lagervarornas `updated_by` stämplas dock med 'System (nattlig)' vid själva
+nollställningen som spår i loggen (visas inte i appen).
+
 ## SQL att köra i Supabase (SQL Editor)
 
 Kör hela blocket en gång. Det är idempotent (säkert att köra om).
@@ -38,6 +44,7 @@ declare
   v_data        jsonb;
   v_target_date date;
   v_existing_id inventory_snapshots.id%type;
+  v_last_user   text;
 begin
   select coalesce(
            jsonb_agg(
@@ -66,6 +73,15 @@ begin
   -- Dagen som just avslutats (svensk tid). Körs 02:00 UTC = tidig morgon -> gårdagen.
   v_target_date := ((now() at time zone 'Europe/Stockholm')::date) - 1;
 
+  -- Senaste verkliga användaren som ändrat ett antal (systemet exkluderas).
+  select updated_by into v_last_user
+  from inventory
+  where antal > 0
+    and updated_by is not null
+    and updated_by <> 'System (nattlig)'
+  order by updated_at desc nulls last
+  limit 1;
+
   -- Finns redan en inventering för den dagen? Uppdatera den i så fall.
   select id into v_existing_id
   from inventory_snapshots
@@ -74,14 +90,14 @@ begin
   limit 1;
 
   if v_existing_id is not null then
+    -- Behåll det namn den manuella summeringen satte; uppdatera bara datan.
     update inventory_snapshots
-    set data      = v_data,
-        skapad_av = 'System (nattlig)'
+    set data = v_data
     where id = v_existing_id;
   else
     insert into inventory_snapshots (skapad_av, data, skapad_at)
     values (
-      'System (nattlig)',
+      v_last_user,
       v_data,
       ((v_target_date::timestamp + time '12:00') at time zone 'Europe/Stockholm')
     );
