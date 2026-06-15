@@ -170,6 +170,16 @@ const Store = {
     if (error) throw error;
   },
 
+  // Skriver det redan cachade antalet till databasen (för debounce-sparning).
+  async writeAmount(id) {
+    const item = this.inventory.find(i => i.id === id);
+    if (!item) return;
+    const { error } = await window.sb.from('inventory')
+      .update({ antal: item.antal, updated_by: window.currentUserEmail || null, updated_at: new Date().toISOString() })
+      .eq('id', id);
+    if (error) throw error;
+  },
+
   // --- Underkategorier ---
   async addSubcategory(huvud, namn) {
     const { data, error } = await window.sb.from('subcategories')
@@ -331,6 +341,7 @@ function showView(name) {
 document.querySelectorAll('.nav-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     if (btn.dataset.view !== 'log') endWeekly(true);
+    if (btn.dataset.view !== 'lager') flushAmountWrites();
     showView(btn.dataset.view);
   });
 });
@@ -1018,23 +1029,42 @@ function renderInventoryItem(item) {
   row.addEventListener('click', () => openItemModal(item.id));
   row.querySelector('.inv-stepper').addEventListener('click', (e) => e.stopPropagation());
 
-  row.querySelector('[data-act="dec"]').addEventListener('click', () => adjustItem(item, -step));
-  row.querySelector('[data-act="inc"]').addEventListener('click', () => adjustItem(item, step));
+  const numEl = row.querySelector('.num');
+  row.querySelector('[data-act="dec"]').addEventListener('click', () => adjustItem(item, -step, numEl));
+  row.querySelector('[data-act="inc"]').addEventListener('click', () => adjustItem(item, step, numEl));
   row.querySelector('[data-act="edit"]').addEventListener('click', () => editAmountInline(item, row));
   return row;
 }
 
-async function adjustItem(item, delta) {
+// Debounce-timers per vara så snabba tryck inte ger en DB-skrivning var.
+const amountWriteTimers = {};
+
+// Skriver omedelbart alla väntande antalsändringar (t.ex. vid byte av vy).
+function flushAmountWrites() {
+  Object.keys(amountWriteTimers).forEach(id => {
+    clearTimeout(amountWriteTimers[id]);
+    delete amountWriteTimers[id];
+    Store.writeAmount(id).catch(err => console.error(err));
+  });
+}
+window.addEventListener('beforeunload', flushAmountWrites);
+
+function adjustItem(item, delta, numEl) {
   const next = Math.max(0, Math.round((item.antal + delta) * 100) / 100);
-  try {
-    await Store.setAmount(item.id, next);
-    renderInventory();
-  } catch (err) {
-    console.error(err);
-    showToast('Kunde inte uppdatera – kolla nätet');
-    await Store.load();
-    renderInventory();
-  }
+  item.antal = next;                                    // optimistisk cache-uppdatering
+  if (numEl) numEl.textContent = formatAmount(item);    // direkt visuell feedback, ingen omritning
+  clearTimeout(amountWriteTimers[item.id]);
+  amountWriteTimers[item.id] = setTimeout(async () => {
+    delete amountWriteTimers[item.id];
+    try {
+      await Store.writeAmount(item.id);
+    } catch (err) {
+      console.error(err);
+      showToast('Kunde inte uppdatera – kolla nätet');
+      await Store.load();
+      renderInventory();
+    }
+  }, 600);
 }
 
 // Tryck på mängden → byt till ett inmatningsfält för exakt värde.
