@@ -17,12 +17,17 @@ hoppas över.
 Om allt redan är 0 gör jobbet ingenting: ingen tom sammanfattning sparas och inga rader
 uppdateras.
 
+**En inventering per dag.** Jobbet representerar dagen som just tagit slut (det körs efter
+midnatt), så det riktar in sig på **gårdagens** datum (svensk tid). Finns redan en
+inventering för den dagen (t.ex. en manuell "Sammanfatta") uppdateras den istället för att
+en ny skapas. Den manuella knappen i appen följer samma regel fast för dagens datum.
+
 ## SQL att köra i Supabase (SQL Editor)
 
 Kör hela blocket en gång. Det är idempotent (säkert att köra om).
 
 ```sql
--- 1. Funktion: spara sammanfattning av varor > 0, nollställ dem sedan.
+-- 1. Funktion: spara/uppdatera gårdagens sammanfattning av varor > 0, nollställ dem sedan.
 create or replace function public.nattlig_lager_nollstallning()
 returns void
 language plpgsql
@@ -30,7 +35,9 @@ security definer
 set search_path = public
 as $$
 declare
-  v_data jsonb;
+  v_data        jsonb;
+  v_target_date date;
+  v_existing_id inventory_snapshots.id%type;
 begin
   select coalesce(
            jsonb_agg(
@@ -56,8 +63,29 @@ begin
     return;
   end if;
 
-  insert into inventory_snapshots (skapad_av, data)
-  values ('System (nattlig)', v_data);
+  -- Dagen som just avslutats (svensk tid). Körs 02:00 UTC = tidig morgon -> gårdagen.
+  v_target_date := ((now() at time zone 'Europe/Stockholm')::date) - 1;
+
+  -- Finns redan en inventering för den dagen? Uppdatera den i så fall.
+  select id into v_existing_id
+  from inventory_snapshots
+  where (skapad_at at time zone 'Europe/Stockholm')::date = v_target_date
+  order by skapad_at desc
+  limit 1;
+
+  if v_existing_id is not null then
+    update inventory_snapshots
+    set data      = v_data,
+        skapad_av = 'System (nattlig)'
+    where id = v_existing_id;
+  else
+    insert into inventory_snapshots (skapad_av, data, skapad_at)
+    values (
+      'System (nattlig)',
+      v_data,
+      ((v_target_date::timestamp + time '12:00') at time zone 'Europe/Stockholm')
+    );
+  end if;
 
   update inventory
   set antal      = 0,
