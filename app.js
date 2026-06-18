@@ -1545,6 +1545,14 @@ function onRemoteChange() {
   }, 150);
 }
 
+// Lager-ändringar: hoppa över ekon från den egna användarens skrivningar. Cachen är
+// redan uppdaterad optimistiskt, och en omritning mitt i snabba +/- nollar räknaren.
+function onInventoryChange(payload) {
+  const changedBy = payload && payload.new ? payload.new.updated_by : null;
+  if (changedBy && changedBy === window.currentUserEmail) return;
+  onRemoteChange();
+}
+
 function onSnapshotsChange() {
   const modal = $('#snapshots-modal');
   if (!modal.classList.contains('hidden') && !$('#snapshots-list').classList.contains('hidden')) {
@@ -1556,7 +1564,7 @@ function subscribeRealtime() {
   window.sb.channel('db-changes')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'units' }, onRemoteChange)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'readings' }, onRemoteChange)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory' }, onRemoteChange)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory' }, onInventoryChange)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'subcategories' }, onRemoteChange)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_snapshots' }, onSnapshotsChange)
     .subscribe();
