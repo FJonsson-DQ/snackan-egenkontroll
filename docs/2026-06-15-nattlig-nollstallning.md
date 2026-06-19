@@ -1,5 +1,10 @@
 # Nattlig nollställning av lagret
 
+> **AVSTÄNGD 2026-06-19.** Den automatiska nattliga nollställningen togs bort på begäran
+> med `select cron.unschedule('nattlig-lager-nollstallning');`. Dokumentet ligger kvar som
+> referens om den ska återaktiveras (kör SQL:en nedan igen). Den manuella knappen
+> "Sammanfatta & nollställ" i appen är opåverkad.
+
 Mål: lagret nollställs automatiskt varje natt, **utom natten mellan lördag och söndag**
 (söndag morgon behåller alltså lördagens värden). Innan nollställning sparas en
 sammanfattning i "Tidigare inventeringar", precis som knappen "Sammanfatta & nollställ".
